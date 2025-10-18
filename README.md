@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Shell Script](https://img.shields.io/badge/shell-bash-green.svg)](zerotier-gateway-setup.sh)
 [![ZeroTier](https://img.shields.io/badge/ZeroTier-1.12+-orange.svg)](https://www.zerotier.com)
+[![Version](https://img.shields.io/badge/version-1.0.1-brightgreen.svg)](https://github.com/rockyshi1993/zerotier-gateway/releases)
+[![Maintenance](https://img.shields.io/badge/maintained-yes-green.svg)](https://github.com/rockyshi1993/zerotier-gateway/commits/main)
 
 ## 🌟 功能特性
 
@@ -61,6 +63,21 @@ sudo bash zerotier-gateway-setup.sh -n YOUR_NETWORK_ID -y
 2. 点击 **Create A Network**
 3. 复制 **Network ID** (16位十六进制字符，如: `1234567890abcdef`)
 
+### 获取 API Token（可选）
+
+如果想要自动配置路由，获取 API Token：
+
+1. 访问 [ZeroTier Account](https://my.zerotier.com/account)
+2. 滚动到 **API Access Tokens** 部分
+3. 在 **New Token** 输入框填写名称（如: `gateway-script`）
+4. 点击 **Generate**
+5. 复制生成的 Token（只显示一次，请妥善保存）
+
+⚠️ **注意**: 
+- API Token 完全可选，仅用于自动配置路由
+- 免费版完全支持，无任何限制
+- 丢失后需要重新生成
+
 ## 📖 使用说明
 
 ### 命令选项
@@ -106,6 +123,10 @@ sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -t YOUR_API_TOKEN -y
 sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -l 192.168.1.0/24 -y
 ```
 
+⚠️ **内网穿透要求**:
+- 网关节点必须在内网环境，或通过其他方式能访问内网
+- 如果网关是公网 VPS，无法直接访问你的家庭/办公室内网
+
 #### 4️⃣ 多个内网网段
 
 ```bash
@@ -130,6 +151,179 @@ sudo bash zerotier-gateway-setup.sh \
 ```bash
 sudo bash zerotier-gateway-setup.sh -u
 ```
+
+## 🔍 如何确定内网网段
+
+### 方法一：Linux 系统查看
+
+```bash
+# 查看所有网络接口和 IP 地址
+ip addr show
+
+# 或者使用传统命令
+ifconfig
+
+# 查看路由表（找局域网网段）
+ip route show
+```
+
+**输出示例：**
+```
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
+    inet 192.168.1.100/24 brd 192.168.1.255 scope global eth0
+```
+
+**解读：**
+- `192.168.1.100/24` 表示当前 IP 是 192.168.1.100
+- `/24` 表示子网掩码 255.255.255.0
+- **内网网段就是：`192.168.1.0/24`**
+
+### 方法二：Windows 系统查看
+
+```powershell
+# 查看网络配置
+ipconfig
+
+# 详细信息
+ipconfig /all
+```
+
+**输出示例：**
+```
+以太网适配器 以太网:
+   IPv4 地址 . . . . . . . . . : 192.168.1.100
+   子网掩码 . . . . . . . . . : 255.255.255.0
+   默认网关 . . . . . . . . . : 192.168.1.1
+```
+
+**换算方法：**
+- IP: 192.168.1.100
+- 子网掩码: 255.255.255.0 = /24
+- **内网网段：`192.168.1.0/24`**
+
+### 方法三：macOS 系统查看
+
+```bash
+# 查看网络配置
+ifconfig | grep "inet "
+
+# 输出示例：
+# inet 192.168.1.100 netmask 0xffffff00 broadcast 192.168.1.255
+# 0xffffff00 = 255.255.255.0 = /24
+```
+
+### 方法四：路由器管理界面
+
+1. 访问路由器管理页面（常见地址）：
+   - `http://192.168.1.1` (TP-Link/D-Link)
+   - `http://192.168.0.1` (Netgear)
+   - `http://192.168.31.1` (小米路由器)
+   - `http://192.168.3.1` (华为路由器)
+   - `http://tplogin.cn` (TP-Link 中国)
+
+2. 查看 **LAN 设置** 或 **局域网设置**
+3. 找到 **IP 地址段** 或 **DHCP 地址池**
+
+### 子网掩码对照表
+
+| 子网掩码 | CIDR | 可用 IP 数 | 常见场景 |
+|---------|------|-----------|---------|
+| 255.255.255.0 | /24 | 254 | 家庭网络 |
+| 255.255.254.0 | /23 | 510 | 小型企业 |
+| 255.255.252.0 | /22 | 1022 | 中型企业 |
+| 255.255.0.0 | /16 | 65534 | 大型企业 |
+| 255.0.0.0 | /8 | 16777214 | 超大型网络 |
+
+### 常见内网网段表
+
+| 网段类型 | CIDR 格式 | IP 范围 | 可用 IP 数量 | 常见场景 |
+|---------|-----------|---------|-------------|---------|
+| C类私网 | 192.168.1.0/24 | 192.168.1.1 - 192.168.1.254 | 254 | 家庭/小型办公室 |
+| C类私网(大) | 192.168.0.0/16 | 192.168.0.1 - 192.168.255.254 | 65534 | 企业内网 |
+| A类私网 | 10.0.0.0/8 | 10.0.0.1 - 10.255.255.254 | 16777214 | 大型企业 |
+| B类私网 | 172.16.0.0/12 | 172.16.0.1 - 172.31.255.254 | 1048574 | 中型企业 |
+
+### 实际应用示例
+
+#### 场景 1：家庭网络穿透
+
+**需求：** 远程访问家里的 NAS (192.168.1.50)
+
+```bash
+# 1. 在家里的电脑上确认网段
+ip addr show | grep "inet "
+# 输出：inet 192.168.1.100/24
+
+# 2. 在家里的 Linux 机器上安装网关（不是 VPS！）
+sudo bash zerotier-gateway-setup.sh \
+  -n 1234567890abcdef \
+  -l 192.168.1.0/24 \
+  -y
+
+# 3. 现在在外面可以通过 ZeroTier 访问家里的 NAS
+ping 192.168.1.50
+ssh user@192.168.1.50
+```
+
+#### 场景 2：办公室网络访问
+
+**需求：** 在家访问办公室的内网服务器 (10.0.0.50)
+
+```bash
+# 在办公室的 Linux 服务器上安装
+sudo bash zerotier-gateway-setup.sh \
+  -n 1234567890abcdef \
+  -l 10.0.0.0/24 \
+  -y
+
+# 在家通过 ZeroTier 客户端加入网络后即可访问
+ping 10.0.0.50
+```
+
+#### 场景 3：多地网络互联
+
+**需求：** 同时访问家里 (192.168.1.0/24) 和办公室 (10.0.0.0/24)
+
+```bash
+# 方案 1：在一台机器上配置多个网段（该机器需要能访问两个网络）
+sudo bash zerotier-gateway-setup.sh \
+  -n 1234567890abcdef \
+  -l 192.168.1.0/24,10.0.0.0/24 \
+  -y
+
+# 方案 2：分别在两个地方各安装一个网关（推荐）
+# 家里机器：
+sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -l 192.168.1.0/24 -y
+
+# 办公室机器：
+sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -l 10.0.0.0/24 -y
+```
+
+### 快速验证
+
+```bash
+# 1. 在网关节点查看路由是否添加成功
+ip route show | grep zt
+# 应该看到：192.168.1.0/24 dev zt0 scope link
+
+# 2. 从客户端测试
+ping <网关ZT IP>        # 测试网关连通性
+ping 192.168.1.1        # 测试内网网关
+ping 192.168.1.50       # 测试内网设备
+
+# 3. 使用 traceroute 查看路径
+traceroute 192.168.1.50
+# 应该看到流量经过 ZeroTier 网关
+```
+
+### ⚠️ 常见错误
+
+| 错误现象 | 可能原因 | 解决方案 |
+|---------|---------|---------|
+| 无法访问内网 | 网段填错 | 检查确认正确的网段 |
+| ping 不通 | 网关不在内网 | 网关必须能访问目标内网 |
+| 部分 IP 不通 | 网段范围太小 | 使用更大的网段如 /16 |
+| 路由冲突 | 客户端也在相同网段 | 修改客户端本地网段 |
 
 ## 💻 客户端配置
 
@@ -335,14 +529,18 @@ ping <网关ZT IP>
 # 检查内网路由
 ip route show | grep <内网网段>
 
+# 在网关节点测试能否访问内网
+ping <内网设备IP>
+
 # 在网关抓包
 sudo tcpdump -i <ZT接口> icmp
 
-# 在内网设备检查路由
-# 确保内网设备的网关指向正确
+# 检查内网设备防火墙
+# 确保内网设备允许来自 ZeroTier 网段的访问
 
 # 测试内网连通性
 ping <内网设备IP>
+traceroute <内网设备IP>
 ```
 
 ### 问题 3: 客户端无法连接到 ZeroTier
@@ -646,6 +844,67 @@ sudo cp -r ~/zerotier-one-backup/* /var/lib/zerotier-one/
 sudo systemctl start zerotier-one
 ```
 
+### Q11: 内网穿透时网关应该放在哪里？
+
+**A:** 网关节点**必须**能访问到目标内网，有以下几种部署方案：
+
+#### 方案 1：网关在内网（推荐）
+```
+[家里内网] ← 网关在这里
+  ├─ 网关服务器 (运行脚本)
+  ├─ NAS (192.168.1.50)
+  └─ 其他设备
+
+外网客户端 → ZeroTier → 网关 → 内网设备 ✅
+```
+
+#### 方案 2：公网 VPS + VPN 连接内网
+```
+[公网 VPS] ← 网关在这里
+     │
+     │ (通过 OpenVPN/WireGuard 连接)
+     ▼
+[家里内网]
+  ├─ NAS (192.168.1.50)
+  └─ 其他设备
+
+外网客户端 → ZeroTier → VPS网关 → VPN → 内网设备 ✅
+```
+
+#### 方案 3：公网 VPS 直接访问（不推荐）
+```
+[公网 VPS] ← 网关在这里
+     │
+     ✗ (无法直接访问内网)
+     
+[家里内网] ← 无法访问 ❌
+```
+
+### Q12: 内网穿透不通怎么办？
+
+**A:** 按以下步骤排查：
+
+```bash
+# 1. 在网关节点测试能否访问内网
+ping 192.168.1.50
+# 如果不通，说明网关无法访问内网
+
+# 2. 检查网关的路由
+ip route show | grep 192.168.1.0
+# 应该看到：192.168.1.0/24 dev zt0
+
+# 3. 从客户端 traceroute
+traceroute 192.168.1.50
+# 查看数据包是否到达网关
+
+# 4. 在网关抓包
+sudo tcpdump -i zt0 -n icmp
+# 然后从客户端 ping，看是否收到数据包
+
+# 5. 检查内网设备防火墙
+# 确保内网设备允许来自 ZeroTier 网段的访问
+```
+
 ## 📚 参考资源
 
 ### 官方文档
@@ -702,9 +961,28 @@ sudo systemctl start zerotier-one
 
 ---
 
-## 更新日志
+## 📝 更新日志
 
-### v1.0.0 (2025-10-18)
+### v1.0.1 (2025-01-18)
+
+#### 🐛 Bug 修复
+- 修复 API 路由配置 JSON 拼接错误（阻断性问题）
+- 修复 hostname 命令注入安全风险
+- 修复 iptables 规则重复添加问题
+- 修复 NODE_ID 获取失败时未正确处理
+
+#### ✨ 新增功能
+- 添加 CIDR 网段格式验证
+- 添加 jq 依赖检查和友好提示
+- 添加网络连通性自动测试
+- 添加 ZeroTier 安装确认提示
+
+#### 🔧 优化改进
+- 改进错误提示信息（显示详细诊断）
+- 优化 iptables 保存逻辑
+- 完善异常情况处理
+
+### v1.0.0 (2025-01-18)
 
 - ✨ 初始版本发布
 - ✅ 支持 VPN 全局出站
