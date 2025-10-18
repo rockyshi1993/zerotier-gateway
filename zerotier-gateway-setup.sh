@@ -2,7 +2,7 @@
 
 ################################################################################
 # ZeroTier Linux 网关一键配置脚本 (智能增强版)
-# 版本: 1.2.0 - 添加安装进度显示
+# 版本: 1.2.1 - 优化进度显示和用户体验
 # 作者: rockyshi1993
 # 日期: 2025-10-18
 ################################################################################
@@ -66,6 +66,7 @@ step_start() {
     ((CURRENT_STEP++))
     STEP_START_TIME=$(date +%s)
     show_progress "$CURRENT_STEP" "$TOTAL_STEPS" "$1"
+    sleep 0.3  # 短暂延迟，确保进度条可见
 }
 
 # 步骤完成
@@ -74,28 +75,13 @@ step_done() {
     log_info "$1 (耗时: ${elapsed}秒)"
 }
 
-# 显示总体进度摘要
-show_summary() {
-    echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║${NC}                    ${GREEN}✓ 安装进度概览${NC}                          ${CYAN}║${NC}"
-    echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
-    
-    for i in $(seq 1 $CURRENT_STEP); do
-        local status="${GREEN}✓${NC}"
-        echo -e "${CYAN}║${NC} $status 步骤 $i 已完成                                              ${CYAN}║${NC}"
-    done
-    
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
-}
-
 check_root() {
     [[ $EUID -ne 0 ]] && log_error "需要 root 权限，请使用: sudo bash $0" && exit 1
 }
 
 show_help() {
     cat << 'EOF'
-ZeroTier Gateway Setup Script v1.2.0 (带进度显示)
+ZeroTier Gateway Setup Script v1.2.1 (优化版)
 
 用法: sudo bash zerotier-gateway-setup.sh [选项]
 
@@ -104,19 +90,26 @@ ZeroTier Gateway Setup Script v1.2.0 (带进度显示)
     -t <TOKEN>  API Token (可选，用于自动配置路由)
     -l <NETS>   内网网段，逗号分隔 (可选，如: 192.168.1.0/24,10.0.0.0/24)
     -a          自动检测内网网段
-    -y          跳过确认提示
+    -y          跳过所有确认提示（快速安装）
     -u          卸载所有配置
     -h          显示帮助
 
 示例:
-    # 智能安装（带进度显示）
+    # 标准安装（推荐 - 有进度和确认）
+    sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -a
+
+    # 快速安装（跳过确认）
     sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -a -y
 
-新功能 (v1.2.0):
-    ✨ 详细的安装进度显示
+    # 完全自动化（API Token + 自动检测 + 跳过确认）
+    sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -t YOUR_TOKEN -a -y
+
+新功能 (v1.2.1):
+    ✨ 详细的实时进度显示
     ✨ 每步骤耗时统计
-    ✨ 可视化进度条
-    ✨ 实时状态更新
+    ✨ 可视化进度条（50字符宽）
+    ✨ 彩色输出增强可读性
+    ✨ 优化确认流程
 
 项目: https://github.com/rockyshi1993/zerotier-gateway
 EOF
@@ -152,6 +145,12 @@ backup_config() {
         cp /etc/zerotier-gateway.conf "$BACKUP_DIR/zerotier-gateway-${timestamp}.conf"
         echo -e "${GREEN}完成${NC}"
     fi
+    
+    # 清理旧备份（保留最近5个）
+    echo -n "  正在清理旧备份... "
+    find "$BACKUP_DIR" -name "iptables-*.rules" -type f | sort -r | tail -n +6 | xargs rm -f 2>/dev/null || true
+    find "$BACKUP_DIR" -name "routes-*.dump" -type f | sort -r | tail -n +6 | xargs rm -f 2>/dev/null || true
+    echo -e "${GREEN}完成${NC}"
     
     step_done "配置备份完成"
 }
@@ -230,17 +229,24 @@ auto_detect_lan_subnets() {
                 echo "    • $subnet"
             done
             
-            # 如果用户没有指定网段且没有跳过确认，则询问
-            if [ -z "$LAN_SUBNETS" ] && [ "$SKIP_CONFIRM" != true ]; then
-                echo ""
-                read -p "是否使用这些网段进行内网穿透? (Y/n): " confirm
-                if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+            # 询问用户是否使用（除非指定了 -y）
+            if [ -z "$LAN_SUBNETS" ]; then
+                if [ "$SKIP_CONFIRM" = true ]; then
                     LAN_SUBNETS="$detected_subnets"
                     log_info "已自动配置内网网段"
+                else
+                    echo ""
+                    echo -e "${YELLOW}是否使用这些网段进行内网穿透?${NC}"
+                    echo "  选择 Yes: 远程可以访问这些内网设备"
+                    echo "  选择 No:  仅配置 VPN 全局出站"
+                    read -p "请选择 (Y/n): " confirm
+                    if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+                        LAN_SUBNETS="$detected_subnets"
+                        log_info "已配置内网穿透"
+                    else
+                        log_info "跳过内网穿透配置"
+                    fi
                 fi
-            elif [ -z "$LAN_SUBNETS" ] && [ "$AUTO_DETECT_LAN" = true ]; then
-                LAN_SUBNETS="$detected_subnets"
-                log_info "已自动配置内网网段"
             fi
         fi
     else
@@ -291,7 +297,6 @@ check_network_conflicts() {
     echo "  正在检查已有配置..."
     if [ -f /etc/zerotier-gateway.conf ]; then
         conflicts+=("检测到已存在的配置")
-        log_warn "建议先卸载: sudo bash $0 -u"
         ((warnings++))
     fi
     
@@ -305,8 +310,16 @@ check_network_conflicts() {
         echo ""
         
         if [ "$SKIP_CONFIRM" != true ]; then
-            read -p "是否继续安装? (y/N): " confirm
-            [[ ! "$confirm" =~ ^[Yy]$ ]] && log_info "用户取消安装" && exit 0
+            echo -e "${YELLOW}提示: 这些冲突通常不会影响安装，但可能需要额外配置${NC}"
+            read -p "是否继续安装? (Y/n): " confirm
+            if [[ "$confirm" =~ ^[Nn]$ ]]; then
+                log_info "用户取消安装"
+                if [ -f /etc/zerotier-gateway.conf ]; then
+                    echo ""
+                    echo "建议先卸载现有配置: sudo bash $0 -u"
+                fi
+                exit 0
+            fi
         else
             log_warn "跳过确认，继续安装..."
         fi
@@ -371,24 +384,34 @@ install_dependencies() {
         echo "    ✓ 网络工具已安装"
     fi
     
-    # 如果有缺失的工具，尝试安装
+    # 如果有缺失的工具，询问是否安装
     if [ ${#missing_tools[@]} -gt 0 ]; then
         log_warn "缺少必要工具: ${missing_tools[*]}"
         
-        if [ "$SKIP_CONFIRM" != true ]; then
+        if [ "$SKIP_CONFIRM" = true ]; then
+            echo "  自动安装缺失工具..."
+        else
+            echo ""
             read -p "是否自动安装? (Y/n): " confirm
-            [[ "$confirm" =~ ^[Nn]$ ]] && log_warn "跳过依赖安装" && return
+            if [[ "$confirm" =~ ^[Nn]$ ]]; then
+                log_warn "跳过依赖安装（某些功能可能受限）"
+                step_done "依赖检查完成（部分工具缺失）"
+                return
+            fi
         fi
         
         echo "  正在安装依赖工具..."
         # 检测包管理器并安装
         if command -v apt-get &>/dev/null; then
+            echo "    使用 apt-get 安装..."
             apt-get update -qq 2>/dev/null || true
-            apt-get install -y ipcalc net-tools 2>/dev/null || true
+            apt-get install -y ipcalc net-tools 2>&1 | grep -v "^Selecting" | grep -v "^Preparing" || true
         elif command -v yum &>/dev/null; then
-            yum install -y ipcalc net-tools 2>/dev/null || true
+            echo "    使用 yum 安装..."
+            yum install -y ipcalc net-tools 2>&1 | grep -v "^Loaded plugins" || true
         elif command -v dnf &>/dev/null; then
-            dnf install -y ipcalc net-tools 2>/dev/null || true
+            echo "    使用 dnf 安装..."
+            dnf install -y ipcalc net-tools 2>&1 | grep -v "^Last metadata" || true
         fi
         
         log_info "依赖工具已安装"
@@ -453,13 +476,14 @@ if [ "$UNINSTALL" = true ]; then
     
     log_info "卸载完成"
     
-    if [ -d "$BACKUP_DIR" ]; then
-        if [ "$SKIP_CONFIRM" != true ]; then
-            read -p "是否删除备份文件? (y/N): " confirm
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                rm -rf "$BACKUP_DIR"
-                log_info "备份文件已删除"
-            fi
+    if [ -d "$BACKUP_DIR" ] && [ "$SKIP_CONFIRM" != true ]; then
+        echo ""
+        read -p "是否删除备份文件? (y/N): " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            rm -rf "$BACKUP_DIR"
+            log_info "备份文件已删除"
+        else
+            log_info "备份文件保留在: $BACKUP_DIR"
         fi
     fi
     exit 0
@@ -479,14 +503,22 @@ clear
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.0${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.1${NC}               ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${CYAN}║${NC}  Network ID: ${YELLOW}$NETWORK_ID${NC}                         ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  总步骤: ${YELLOW}$TOTAL_STEPS${NC} 步                                             ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  预计时间: ${YELLOW}3-5${NC} 分钟                                          ${CYAN}║${NC}"
+[ "$SKIP_CONFIRM" = true ] && echo -e "${CYAN}║${NC}  模式: ${YELLOW}快速安装${NC} (跳过确认)                              ${CYAN}║${NC}"
+[ "$SKIP_CONFIRM" != true ] && echo -e "${CYAN}║${NC}  模式: ${GREEN}标准安装${NC} (带确认提示)                            ${CYAN}║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
+
+if [ "$SKIP_CONFIRM" != true ]; then
+    echo -e "${YELLOW}提示: 使用 -y 参数可跳过所有确认提示进行快速安装${NC}"
+    echo ""
+    read -p "按回车键开始安装，或按 Ctrl+C 取消: " _
+fi
 
 # 记录开始时间
 INSTALL_START_TIME=$(date +%s)
@@ -514,23 +546,36 @@ fi
 step_start "安装 ZeroTier"
 
 if ! command -v zerotier-cli &>/dev/null; then
-    echo "  ZeroTier 未安装，开始安装..."
+    echo "  ZeroTier 未安装，需要安装..."
+    
     if [ "$SKIP_CONFIRM" != true ]; then
-        read -p "是否继续? (y/N): " confirm
-        [[ ! "$confirm" =~ ^[Yy]$ ]] && log_info "用户取消安装" && exit 0
+        echo ""
+        echo -e "${YELLOW}即将从官方源下载并安装 ZeroTier${NC}"
+        echo "  来源: https://install.zerotier.com"
+        read -p "是否继续? (Y/n): " confirm
+        if [[ "$confirm" =~ ^[Nn]$ ]]; then
+            log_info "用户取消安装"
+            exit 0
+        fi
     fi
     
-    echo -n "  正在下载安装脚本... "
-    curl -s https://install.zerotier.com | bash
-    echo -e "${GREEN}完成${NC}"
+    echo "  正在下载并安装 ZeroTier (可能需要 1-2 分钟，请耐心等待)..."
+    echo ""
     
-    echo -n "  正在启动服务... "
-    systemctl enable zerotier-one
+    # 显示安装输出（但过滤掉过多的细节）
+    if curl -s https://install.zerotier.com 2>&1 | bash 2>&1 | \
+       grep -E "Installing|Installed|Starting|zerotier-one|Success|已安装|正在安装" || true; then
+        echo ""
+        log_info "ZeroTier 安装成功"
+    fi
+    
+    echo -n "  正在启动 ZeroTier 服务... "
+    systemctl enable zerotier-one >/dev/null 2>&1
     systemctl start zerotier-one
     sleep 3
     echo -e "${GREEN}完成${NC}"
 else
-    log_info "ZeroTier 已安装"
+    log_info "ZeroTier 已安装，跳过安装步骤"
     systemctl is-active --quiet zerotier-one || systemctl start zerotier-one
 fi
 
@@ -539,7 +584,7 @@ step_done "ZeroTier 安装完成"
 # 步骤 6: 加入网络
 step_start "加入 ZeroTier 网络"
 
-echo -n "  正在加入网络... "
+echo -n "  正在加入网络 $NETWORK_ID... "
 zerotier-cli join "$NETWORK_ID" >/dev/null 2>&1 || true
 echo -e "${GREEN}完成${NC}"
 
@@ -547,7 +592,7 @@ echo -n "  正在获取 Node ID... "
 NODE_ID=$(zerotier-cli info 2>/dev/null | awk '{print $3}')
 if [ -z "$NODE_ID" ]; then
     echo -e "${RED}失败${NC}"
-    log_error "无法获取 Node ID"
+    log_error "无法获取 Node ID，请检查 ZeroTier 服务状态"
     exit 1
 fi
 echo -e "${GREEN}$NODE_ID${NC}"
@@ -558,32 +603,37 @@ step_done "网络加入完成"
 step_start "等待设备授权"
 
 if [ -n "$API_TOKEN" ]; then
-    echo -n "  正在自动授权... "
+    echo -n "  正在使用 API Token 自动授权... "
     HOSTNAME=$(hostname | tr -d '"' | tr -d "'")
-    curl -s -X POST -H "Authorization: token $API_TOKEN" \
+    if curl -s -X POST -H "Authorization: token $API_TOKEN" \
         -H "Content-Type: application/json" \
         -d '{"config":{"authorized":true},"name":"Gateway-'"$HOSTNAME"'"}' \
-        "https://api.zerotier.com/api/v1/network/$NETWORK_ID/member/$NODE_ID" >/dev/null 2>&1 || true
-    sleep 2
-    echo -e "${GREEN}完成${NC}"
+        "https://api.zerotier.com/api/v1/network/$NETWORK_ID/member/$NODE_ID" >/dev/null 2>&1; then
+        sleep 2
+        echo -e "${GREEN}完成${NC}"
+    else
+        echo -e "${YELLOW}失败，需要手动授权${NC}"
+    fi
 fi
 
 if ! zerotier-cli listnetworks 2>/dev/null | grep "$NETWORK_ID" | grep -q "OK"; then
     echo ""
     log_warn "请在 ZeroTier Central 授权此设备:"
-    echo "  1. 访问: https://my.zerotier.com/network/$NETWORK_ID"
-    echo "  2. 找到 Node ID: $NODE_ID"
-    echo "  3. 勾选 'Auth' 复选框"
     echo ""
+    echo "  1. 打开浏览器访问: ${CYAN}https://my.zerotier.com/network/$NETWORK_ID${NC}"
+    echo "  2. 在 Members 列表中找到 Node ID: ${YELLOW}$NODE_ID${NC}"
+    echo "  3. 勾选该设备的 ${GREEN}Auth${NC} 复选框"
+    echo ""
+    echo "  等待授权中..."
     
     for i in {1..60}; do
         if zerotier-cli listnetworks 2>/dev/null | grep "$NETWORK_ID" | grep -q "OK"; then
             echo ""
-            log_info "设备已授权"
+            log_info "设备已成功授权"
             break
         fi
-        [ $i -eq 60 ] && log_error "授权超时" && exit 1
-        printf "\r  等待授权中... %d/60 秒" $i
+        [ $i -eq 60 ] && log_error "授权超时 (60秒)，请检查网络连接" && exit 1
+        printf "\r  已等待 %d/60 秒... " $i
         sleep 1
     done
 else
@@ -595,28 +645,39 @@ step_done "设备授权完成"
 # 步骤 8: 获取网络信息
 step_start "获取网络配置信息"
 
+echo "  等待网络接口就绪..."
 sleep 2
 
 echo -n "  正在获取 ZeroTier 接口... "
 ZT_IFACE=$(ip addr | grep -oP 'zt\w+' | head -n 1)
+if [ -z "$ZT_IFACE" ]; then
+    echo -e "${RED}失败${NC}"
+    log_error "未找到 ZeroTier 接口"
+    exit 1
+fi
 echo -e "${GREEN}$ZT_IFACE${NC}"
 
-echo -n "  正在获取 ZeroTier IP... "
+echo -n "  正在获取 ZeroTier IP 地址... "
 for i in {1..10}; do
     ZT_IP=$(ip -4 addr show "$ZT_IFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || true)
     [ -n "$ZT_IP" ] && break
     sleep 1
 done
+if [ -z "$ZT_IP" ]; then
+    echo -e "${RED}失败${NC}"
+    log_error "未获取到 ZeroTier IP 地址"
+    exit 1
+fi
 echo -e "${GREEN}$ZT_IP${NC}"
 
 echo -n "  正在获取物理网卡... "
 PHY_IFACE=$(ip route | grep default | awk '{print $5}' | head -n 1)
-echo -e "${GREEN}$PHY_IFACE${NC}"
-
-if [ -z "$ZT_IFACE" ] || [ -z "$ZT_IP" ] || [ -z "$PHY_IFACE" ]; then
-    log_error "无法获取网络信息"
+if [ -z "$PHY_IFACE" ]; then
+    echo -e "${RED}失败${NC}"
+    log_error "未找到默认网络接口"
     exit 1
 fi
+echo -e "${GREEN}$PHY_IFACE${NC}"
 
 step_done "网络信息获取完成"
 
@@ -643,16 +704,19 @@ step_start "配置防火墙规则"
 echo "  正在配置 NAT 规则..."
 iptables -t nat -D POSTROUTING -o "$PHY_IFACE" -j MASQUERADE 2>/dev/null || true
 iptables -t nat -A POSTROUTING -o "$PHY_IFACE" -j MASQUERADE
+echo "    ✓ MASQUERADE 规则已添加"
 
 echo "  正在配置转发规则..."
 iptables -D FORWARD -i "$ZT_IFACE" -o "$PHY_IFACE" -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -i "$ZT_IFACE" -o "$PHY_IFACE" -j ACCEPT
 iptables -D FORWARD -i "$PHY_IFACE" -o "$ZT_IFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -i "$PHY_IFACE" -o "$ZT_IFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
+echo "    ✓ FORWARD 规则已添加"
 
 echo "  正在配置端口规则..."
 iptables -C INPUT -p udp --dport 9993 -j ACCEPT 2>/dev/null || \
     iptables -A INPUT -p udp --dport 9993 -j ACCEPT
+echo "    ✓ 端口 9993/UDP 已开放"
 
 if [ -n "$LAN_SUBNETS" ]; then
     echo "  正在配置内网路由..."
@@ -671,6 +735,7 @@ case $OS in
         if command -v netfilter-persistent &>/dev/null; then
             netfilter-persistent save 2>/dev/null || true
         elif command -v iptables-save &>/dev/null; then
+            mkdir -p /etc/iptables
             iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
         fi
         ;;
@@ -721,7 +786,7 @@ echo -e "${GREEN}完成${NC}"
 
 echo -n "  正在启用服务... "
 systemctl daemon-reload
-systemctl enable zerotier-gateway.service
+systemctl enable zerotier-gateway.service >/dev/null 2>&1
 echo -e "${GREEN}完成${NC}"
 
 step_done "启动脚本创建完成"
@@ -730,7 +795,7 @@ step_done "启动脚本创建完成"
 if [ -n "$API_TOKEN" ]; then
     if command -v jq &>/dev/null; then
         echo ""
-        echo -n "正在自动配置路由... "
+        echo -n "正在使用 API Token 自动配置路由... "
         
         ROUTES=$(curl -s -H "Authorization: token $API_TOKEN" \
             "https://api.zerotier.com/api/v1/network/$NETWORK_ID" | \
@@ -748,18 +813,26 @@ if [ -n "$API_TOKEN" ]; then
         
         FINAL_ROUTES=$(echo "$NEW_ROUTES" | jq 'unique_by(.target)')
         
-        curl -s -X POST -H "Authorization: token $API_TOKEN" \
+        if curl -s -X POST -H "Authorization: token $API_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"config":{"routes":'"$FINAL_ROUTES"'}}' \
-            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" >/dev/null 2>&1
-        
-        echo -e "${GREEN}完成${NC}"
+            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" >/dev/null 2>&1; then
+            echo -e "${GREEN}完成${NC}"
+        else
+            echo -e "${YELLOW}失败${NC}"
+            log_warn "自动路由配置失败，请手动配置"
+        fi
+    else
+        echo ""
+        log_warn "未安装 jq，无法自动配置路由"
+        log_warn "请手动在 ZeroTier Central 配置路由"
     fi
 fi
 
 # 保存配置
 cat > /etc/zerotier-gateway.conf << EOF
-VERSION=1.2.0
+# ZeroTier Gateway 配置文件
+VERSION=1.2.1
 NETWORK_ID=$NETWORK_ID
 NODE_ID=$NODE_ID
 ZT_IFACE=$ZT_IFACE
@@ -774,9 +847,9 @@ EOF
 echo ""
 echo -n "正在测试网络连通性... "
 if ping -c 2 -W 3 8.8.8.8 &>/dev/null; then
-    echo -e "${GREEN}成功${NC}"
+    echo -e "${GREEN}成功 (8.8.8.8)${NC}"
 elif ping -c 2 -W 3 1.1.1.1 &>/dev/null; then
-    echo -e "${GREEN}成功${NC}"
+    echo -e "${GREEN}成功 (1.1.1.1)${NC}"
 else
     echo -e "${YELLOW}警告: 无法访问外网${NC}"
 fi
@@ -820,15 +893,15 @@ if [ -z "$API_TOKEN" ] || ! command -v jq &>/dev/null; then
     echo -e "${YELLOW}下一步操作:${NC}"
     echo ""
     echo "1. 在 ZeroTier Central 手动配置路由:"
-    echo "   https://my.zerotier.com/network/$NETWORK_ID"
+    echo "   ${CYAN}https://my.zerotier.com/network/$NETWORK_ID${NC}"
     echo ""
     echo "   添加以下路由 (Managed Routes):"
-    echo "   • 0.0.0.0/0 via $ZT_IP  (全局出站)"
-    [ -n "$LAN_SUBNETS" ] && for s in $LAN_SUBNETS; do echo "   • $s via $ZT_IP  (内网)"; done
+    echo "   • ${GREEN}0.0.0.0/0${NC} via ${YELLOW}$ZT_IP${NC}  (全局出站)"
+    [ -n "$LAN_SUBNETS" ] && for s in $LAN_SUBNETS; do echo "   • ${GREEN}$s${NC} via ${YELLOW}$ZT_IP${NC}  (内网)"; done
     echo ""
 else
     echo -e "${GREEN}✓ 路由已自动配置${NC}"
-    echo "   查看: https://my.zerotier.com/network/$NETWORK_ID"
+    echo "   查看: ${CYAN}https://my.zerotier.com/network/$NETWORK_ID${NC}"
     echo ""
 fi
 
@@ -840,7 +913,11 @@ echo -e "${CYAN}测试连接:${NC}"
 echo "  ping $ZT_IP"
 echo ""
 echo -e "${CYAN}管理命令:${NC}"
-echo "  查看状态: systemctl status zerotier-gateway"
-echo "  查看配置: cat /etc/zerotier-gateway.conf"
-echo "  卸载: sudo bash $0 -u"
+echo "  查看状态: ${GREEN}systemctl status zerotier-gateway${NC}"
+echo "  查看配置: ${GREEN}cat /etc/zerotier-gateway.conf${NC}"
+echo "  查看日志: ${GREEN}journalctl -u zerotier-one -f${NC}"
+echo "  卸载: ${YELLOW}sudo bash $0 -u${NC}"
+echo ""
+
+log_info "感谢使用 ZeroTier Gateway！"
 echo ""
