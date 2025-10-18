@@ -81,7 +81,7 @@ check_root() {
 
 show_help() {
     cat << 'EOF'
-ZeroTier Gateway Setup Script v1.2.1 (优化版)
+ZeroTier Gateway Setup Script v1.2.2 (优化版)
 
 用法: sudo bash zerotier-gateway-setup.sh [选项]
 
@@ -91,6 +91,7 @@ ZeroTier Gateway Setup Script v1.2.1 (优化版)
     -l <NETS>   内网网段，逗号分隔 (可选，如: 192.168.1.0/24,10.0.0.0/24)
     -a          自动检测内网网段
     -y          跳过所有确认提示（快速安装）
+    -s, --status  查看网关状态
     -u          卸载所有配置
     -h          显示帮助
 
@@ -441,11 +442,149 @@ while [[ $# -gt 0 ]]; do
             ;;
         -a) AUTO_DETECT_LAN=true; shift ;;
         -y) SKIP_CONFIRM=true; shift ;;
+        -s|--status) SHOW_STATUS=true; shift ;;
         -u) UNINSTALL=true; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) log_error "未知选项: $1"; show_help; exit 1 ;;
     esac
 done
+
+# 状态查询功能
+if [ "$SHOW_STATUS" = true ]; then
+    check_root
+    
+    if [ ! -f /etc/zerotier-gateway.conf ]; then
+        log_error "未检测到 ZeroTier Gateway 安装"
+        exit 1
+    fi
+    
+    # 加载配置
+    source /etc/zerotier-gateway.conf
+    
+    clear
+    echo ""
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}                ${GREEN}ZeroTier Gateway 状态${NC}                         ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    # 基本信息
+    echo -e "${CYAN}【基本信息】${NC}"
+    echo "  版本: $VERSION"
+    echo "  Network ID: $NETWORK_ID"
+    echo "  安装日期: $INSTALL_DATE"
+    echo ""
+    
+    # ZeroTier 状态
+    echo -e "${CYAN}【ZeroTier 状态】${NC}"
+    if systemctl is-active --quiet zerotier-one 2>/dev/null; then
+        echo -e "  服务状态: ${GREEN}运行中${NC}"
+        
+        # Node ID
+        if [ -n "$NODE_ID" ]; then
+            echo "  Node ID: $NODE_ID"
+        fi
+        
+        # 网络连接状态
+        if command -v zerotier-cli &>/dev/null; then
+            local zt_status=$(zerotier-cli listnetworks 2>/dev/null | grep "$NETWORK_ID" || echo "")
+            if [ -n "$zt_status" ]; then
+                echo -e "  网络连接: ${GREEN}已连接${NC}"
+                echo "  接口: $ZT_IFACE"
+                echo "  IP 地址: $ZT_IP"
+            else
+                echo -e "  网络连接: ${RED}未连接${NC}"
+            fi
+        fi
+    else
+        echo -e "  服务状态: ${RED}已停止${NC}"
+    fi
+    echo ""
+    
+    # Gateway 服务状态
+    echo -e "${CYAN}【Gateway 服务】${NC}"
+    if systemctl is-active --quiet zerotier-gateway 2>/dev/null; then
+        echo -e "  服务状态: ${GREEN}运行中${NC}"
+    else
+        echo -e "  服务状态: ${RED}已停止${NC}"
+    fi
+    echo ""
+    
+    # 网络配置
+    echo -e "${CYAN}【网络配置】${NC}"
+    echo "  物理接口: $PHY_IFACE"
+    
+    # IP 转发
+    local ip_forward=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
+    if [ "$ip_forward" = "1" ]; then
+        echo -e "  IP 转发: ${GREEN}已启用${NC}"
+    else
+        echo -e "  IP 转发: ${RED}已禁用${NC}"
+    fi
+    
+    # 内网穿透
+    if [ -n "$LAN_SUBNETS" ]; then
+        echo "  内网穿透: 已启用"
+        echo "  穿透网段:"
+        for subnet in $LAN_SUBNETS; do
+            echo "    • $subnet"
+        done
+    else
+        echo "  内网穿透: 未配置"
+    fi
+    echo ""
+    
+    # NAT 规则
+    echo -e "${CYAN}【NAT 规则】${NC}"
+    local nat_count=$(iptables -t nat -L POSTROUTING -n 2>/dev/null | grep -c "MASQUERADE" || echo "0")
+    echo "  MASQUERADE 规则: $nat_count 条"
+    echo ""
+    
+    # 路由信息
+    echo -e "${CYAN}【路由信息】${NC}"
+    if ip route show | grep -q "$ZT_IFACE"; then
+        echo -e "  ZeroTier 路由: ${GREEN}已配置${NC}"
+        ip route show | grep "$ZT_IFACE" | head -5 | sed 's/^/    /'
+    else
+        echo -e "  ZeroTier 路由: ${RED}未配置${NC}"
+    fi
+    echo ""
+    
+    # 快速诊断
+    echo -e "${CYAN}【快速诊断】${NC}"
+    local issues=0
+    
+    if ! systemctl is-active --quiet zerotier-one; then
+        echo -e "  ${RED}✗${NC} ZeroTier 服务未运行"
+        ((issues++))
+    fi
+    
+    if ! systemctl is-active --quiet zerotier-gateway; then
+        echo -e "  ${RED}✗${NC} Gateway 服务未运行"
+        ((issues++))
+    fi
+    
+    if [ "$ip_forward" != "1" ]; then
+        echo -e "  ${RED}✗${NC} IP 转发未启用"
+        ((issues++))
+    fi
+    
+    if [ $nat_count -eq 0 ]; then
+        echo -e "  ${RED}✗${NC} NAT 规则缺失"
+        ((issues++))
+    fi
+    
+    if [ $issues -eq 0 ]; then
+        echo -e "  ${GREEN}✓${NC} 所有检查通过"
+    else
+        echo ""
+        echo -e "${YELLOW}提示: 检测到 $issues 个问题，建议重新安装或检查日志${NC}"
+        echo "  查看日志: journalctl -u zerotier-gateway -n 50"
+    fi
+    
+    echo ""
+    exit 0
+fi
 
 # 卸载功能
 if [ "$UNINSTALL" = true ]; then
@@ -489,10 +628,113 @@ if [ "$UNINSTALL" = true ]; then
     exit 0
 fi
 
+# 预安装系统检查
+pre_install_check() {
+    local warnings=0
+    local errors=0
+    
+    echo -e "${CYAN}▶ 正在执行预安装检查...${NC}"
+    echo ""
+    
+    # 1. 检查 root 权限
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "  ${RED}✗${NC} Root 权限: 缺少 root 权限"
+        ((errors++))
+    else
+        echo -e "  ${GREEN}✓${NC} Root 权限: 已确认"
+    fi
+    
+    # 2. 检查磁盘空间
+    local free_space=$(df / | tail -1 | awk '{print $4}')
+    if [ "$free_space" -lt 1048576 ]; then  # < 1GB
+        echo -e "  ${RED}✗${NC} 磁盘空间: 剩余空间不足 1GB"
+        ((errors++))
+    else
+        echo -e "  ${GREEN}✓${NC} 磁盘空间: 充足 ($(df -h / | tail -1 | awk '{print $4}'))"
+    fi
+    
+    # 3. 检查网络连接
+    if ! ping -c 1 -W 2 8.8.8.8 &>/dev/null && ! ping -c 1 -W 2 1.1.1.1 &>/dev/null; then
+        echo -e "  ${YELLOW}⚠${NC} 网络连接: 无法连接互联网 (安装可能失败)"
+        ((warnings++))
+    else
+        echo -e "  ${GREEN}✓${NC} 网络连接: 正常"
+    fi
+    
+    # 4. 检查系统负载
+    local load_avg=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
+    if (( $(echo "$load_avg > 5.0" | bc -l) )); then
+        echo -e "  ${YELLOW}⚠${NC} 系统负载: 较高 (load: $load_avg)"
+        ((warnings++))
+    else
+        echo -e "  ${GREEN}✓${NC} 系统负载: 正常 (load: $load_avg)"
+    fi
+    
+    # 5. 检查已有配置
+    if [ -f /etc/zerotier-gateway.conf ]; then
+        echo -e "  ${YELLOW}⚠${NC} 已有配置: 检测到旧的安装"
+        ((warnings++))
+    else
+        echo -e "  ${GREEN}✓${NC} 已有配置: 未检测到"
+    fi
+    
+    # 6. 检查 iptables
+    if ! command -v iptables &>/dev/null; then
+        echo -e "  ${RED}✗${NC} iptables: 未安装"
+        ((errors++))
+    else
+        echo -e "  ${GREEN}✓${NC} iptables: 已安装"
+    fi
+    
+    # 7. 检查内核 IP 转发
+    local ip_forward=$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo "0")
+    if [ "$ip_forward" = "0" ]; then
+        echo -e "  ${YELLOW}⚠${NC} IP 转发: 当前已禁用 (将自动启用)"
+        ((warnings++))
+    else
+        echo -e "  ${GREEN}✓${NC} IP 转发: 已启用"
+    fi
+    
+    echo ""
+    
+    # 总结
+    if [ $errors -gt 0 ]; then
+        log_error "预安装检查失败: $errors 个错误, $warnings 个警告"
+        echo ""
+        echo "请解决以上错误后再试。"
+        exit 1
+    elif [ $warnings -gt 0 ]; then
+        log_warn "预安装检查通过但有 $warnings 个警告"
+        echo ""
+        if [ "$SKIP_CONFIRM" != true ]; then
+            read -p "是否继续安装? (Y/n): " confirm
+            if [[ "$confirm" =~ ^[Nn]$ ]]; then
+                log_info "用户取消安装"
+                exit 0
+            fi
+        fi
+    else
+        echo -e "${GREEN}✓ 预安装检查全部通过${NC}"
+    fi
+    
+    echo ""
+}
+
 # 检查必填参数
 check_root
 if [[ ! "$NETWORK_ID" =~ ^[a-f0-9]{16}$ ]]; then
-    log_error "无效的 Network ID (必须是16位十六进制)"
+    log_error "无效的 Network ID"
+    echo ""
+    echo -e "${RED}错误详情:${NC}"
+    echo "  • Network ID 必须是 16 位十六进制字符"
+    echo "  • 有效字符: 0-9, a-f"
+    echo "  • 示例: 1234567890abcdef"
+    echo ""
+    echo -e "${YELLOW}如何获取 Network ID?${NC}"
+    echo "  1. 访问 https://my.zerotier.com"
+    echo "  2. 登录您的账号"
+    echo "  3. 在 Networks 页面找到或创建一个网络"
+    echo "  4. Network ID 显示在网络名称下方"
     echo ""
     show_help
     exit 1
@@ -503,7 +745,7 @@ clear
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.1${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.2${NC}               ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${CYAN}║${NC}  Network ID: ${YELLOW}$NETWORK_ID${NC}                         ${CYAN}║${NC}"
@@ -513,6 +755,9 @@ echo -e "${CYAN}║${NC}  预计时间: ${YELLOW}3-5${NC} 分钟                
 [ "$SKIP_CONFIRM" != true ] && echo -e "${CYAN}║${NC}  模式: ${GREEN}标准安装${NC} (带确认提示)                            ${CYAN}║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
+
+# 执行预安装检查
+pre_install_check
 
 if [ "$SKIP_CONFIRM" != true ]; then
     echo -e "${YELLOW}提示: 使用 -y 参数可跳过所有确认提示进行快速安装${NC}"
@@ -832,7 +1077,7 @@ fi
 # 保存配置
 cat > /etc/zerotier-gateway.conf << EOF
 # ZeroTier Gateway 配置文件
-VERSION=1.2.1
+VERSION=1.2.2
 NETWORK_ID=$NETWORK_ID
 NODE_ID=$NODE_ID
 ZT_IFACE=$ZT_IFACE
@@ -842,6 +1087,10 @@ LAN_SUBNETS="$LAN_SUBNETS"
 INSTALL_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP_DIR=$BACKUP_DIR
 EOF
+
+# 设置配置文件权限（安全加固）
+chmod 600 /etc/zerotier-gateway.conf
+chown root:root /etc/zerotier-gateway.conf 2>/dev/null || true
 
 # 测试网络
 echo ""

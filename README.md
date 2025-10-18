@@ -5,8 +5,9 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Shell Script](https://img.shields.io/badge/shell-bash-green.svg)](zerotier-gateway-setup.sh)
 [![ZeroTier](https://img.shields.io/badge/ZeroTier-1.12+-orange.svg)](https://www.zerotier.com)
-[![Version](https://img.shields.io/badge/version-1.2.1-brightgreen.svg)](https://github.com/rockyshi1993/zerotier-gateway/releases)
+[![Version](https://img.shields.io/badge/version-1.2.2-brightgreen.svg)](https://github.com/rockyshi1993/zerotier-gateway/releases)
 [![Maintenance](https://img.shields.io/badge/maintained-yes-green.svg)](https://github.com/rockyshi1993/zerotier-gateway/commits/main)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](test/)
 
 ## 🌟 功能特性
 
@@ -18,6 +19,13 @@
 - ✅ **自动路由配置** - 可选 API Token，自动在 ZeroTier Central 配置路由
 - ✅ **一键安装** - 自动化安装和配置，支持多种 Linux 发行版
 - ✅ **持久化配置** - 重启后自动恢复配置
+
+### 🎉 v1.2.2 新增功能（安全与用户体验改进）
+
+- 🔒 **安全加固** - 配置文件权限设为 600，仅 root 可访问
+- ✅ **预安装检查** - 检查系统环境（权限、磁盘、网络、负载）
+- 📊 **状态查询** - 使用 `-s, --status` 查看网关运行状态
+- 💬 **友好错误** - 详细的错误说明和解决建议
 
 ### 🎉 v1.2.1 新增功能
 
@@ -160,7 +168,7 @@ sudo bash zerotier-gateway-setup.sh [选项]
 
 ### 使用示例
 
-#### 1️⃣ 标准安装（推荐 ⭐ v1.2.1）
+#### 1️⃣ 标准安装（推荐 ⭐ v1.2.2）
 
 ```bash
 # 带进度显示和确认提示
@@ -168,20 +176,39 @@ sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -a
 ```
 
 **特点**：
+- ✅ 预安装环境检查
 - ✅ 12步详细进度显示
 - ✅ 每步骤耗时统计
 - ✅ 关键操作需要确认
 - ✅ 可视化进度条
 - ✅ 彩色输出增强可读性
+- ✅ 配置文件安全加固
 
 **安装流程**：
 1. 显示欢迎界面
-2. 按回车键开始安装
-3. 在需要确认的步骤会暂停等待输入
-4. 显示详细的进度和状态
-5. 完成后显示配置摘要
+2. 执行预安装检查（权限、磁盘、网络等）
+3. 按回车键开始安装
+4. 在需要确认的步骤会暂停等待输入
+5. 显示详细的进度和状态
+6. 完成后显示配置摘要
 
-#### 2️⃣ 快速安装（无确认）
+#### 2️⃣ 查看网关状态（v1.2.2 新功能 ✨）
+
+```bash
+# 查看网关运行状态和配置信息
+sudo bash zerotier-gateway-setup.sh --status
+# 或
+sudo bash zerotier-gateway-setup.sh -s
+```
+
+**显示信息**：
+- 📌 基本信息（版本、Network ID、安装日期）
+- 🔧 ZeroTier 和 Gateway 服务状态
+- 🌐 网络配置（IP 转发、内网穿透、NAT 规则）
+- 📡 路由信息
+- 🔍 快速诊断（检测常见问题）
+
+#### 3️⃣ 快速安装（无确认）
 
 ```bash
 # 跳过所有确认提示
@@ -1273,6 +1300,144 @@ sudo systemctl start zerotier-one
 - ✅ 支持 API Token 自动配置路由
 - ✅ 支持一键安装/卸载
 - ✅ 支持多种 Linux 发行版
+
+---
+
+## 🧪 测试
+
+本项目包含完整的测试套件，确保代码质量和稳定性。
+
+### 运行测试
+
+```bash
+# 运行单元测试（无需 root）
+bash test/unit-tests.sh
+
+# 运行集成测试（需要 root）
+sudo bash test/integration-tests.sh
+
+# 运行所有测试
+sudo bash test/run-tests.sh
+```
+
+### 测试覆盖
+
+**单元测试**（35 个测试用例）:
+- Network ID 格式验证
+- 私有 IP 网段识别
+- CIDR 格式完整验证
+- MTU 值范围检查
+- 进度计算
+- 备份文件名生成
+- 主机名清理
+- 数组操作
+
+**集成测试**（需要 root 权限）:
+- 系统依赖检查（iptables、ip、systemctl 等）
+- IP 转发功能测试
+- iptables 规则操作
+- 网络接口检测
+- Systemd 服务管理
+- 文件权限设置
+- 备份恢复功能
+- 网络连通性验证
+- 磁盘空间检查
+
+### 测试报告
+
+```bash
+╔════════════════════════════════════════════════════════════════╗
+║                   单元测试摘要                                 ║
+╠════════════════════════════════════════════════════════════════╣
+║  总测试数: 35                                                  ║
+║  通过:     35                                                  ║
+║  失败:     0                                                  ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## 📚 使用示例
+
+本项目提供了丰富的使用示例，位于 `examples/` 目录：
+
+### 示例列表
+
+1. **基础安装** (`examples/basic-install.sh`)
+   - 最简单的安装方式
+   - 自动检测内网网段
+   - 适合新手和测试环境
+
+2. **高级安装** (`examples/advanced-install.sh`)
+   - 完全自动化安装
+   - 使用 API Token 自动配置
+   - 适合批量部署和 CI/CD
+
+3. **卸载** (`examples/uninstall.sh`)
+   - 安全卸载所有配置
+   - 可选保留备份文件
+   - 恢复系统原始状态
+
+### 快速使用
+
+```bash
+# 进入示例目录
+cd examples/
+
+# 编辑示例文件，填入你的 Network ID
+vim basic-install.sh
+
+# 运行示例
+sudo bash basic-install.sh
+```
+
+详细说明请查看 [examples/README.md](examples/README.md)
+
+---
+
+## 🐛 已知问题
+
+详细的问题分析和修复建议请查看 [ISSUES.md](ISSUES.md)。
+
+### 当前已知问题
+
+1. **安全问题**
+   - API Token 存储权限需要加固（计划在 v1.2.2 修复）
+   - curl 请求缺少超时设置（计划在 v1.2.2 修复）
+
+2. **兼容性问题**
+   - 某些发行版 iptables 规则保存方式不统一
+   - 未检测 nftables vs iptables 冲突
+
+3. **边界情况**
+   - 未处理多个 ZeroTier 接口的场景
+   - MTU 测试在无网络环境可能失败
+
+完整的问题列表、严重性分类和修复计划请参考 [ISSUES.md](ISSUES.md)。
+
+---
+
+## 🗺️ 项目路线图
+
+详细的功能状态和开发计划请查看 [STATUS.md](STATUS.md)。
+
+### 已实现（v1.2.1）
+- ✅ 核心 VPN 网关功能
+- ✅ 智能内网检测
+- ✅ 配置备份回滚
+- ✅ 完整测试套件
+- ✅ 使用示例
+
+### 进行中
+- 🔄 故障排查示例
+- 🔄 CI/CD 集成
+- 🔄 端到端测试
+
+### 计划中（v1.3.0）
+- 📋 IPv6 支持
+- 📋 流量统计监控
+- 📋 Web 管理界面
+- 📋 Docker 容器支持
 
 ---
 
