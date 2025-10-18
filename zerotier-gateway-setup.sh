@@ -12,8 +12,8 @@
 # Windows 客户端：直接使用官方客户端 https://www.zerotier.com/download/
 #
 # 作者: rockyshi1993
-# 日期: 2025-10-18
-# 版本: 1.0.0
+# 日期: 2025-01-18
+# 版本: 1.0.1
 ################################################################################
 
 set -e
@@ -45,7 +45,7 @@ check_root() {
 
 show_help() {
     cat << 'EOF'
-ZeroTier Gateway Setup Script v1.0.0
+ZeroTier Gateway Setup Script v1.0.1
 
 用法: sudo bash zerotier-gateway-setup.sh [选项]
 
@@ -84,7 +84,17 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -n) NETWORK_ID="$2"; shift 2 ;;
         -t) API_TOKEN="$2"; shift 2 ;;
-        -l) LAN_SUBNETS=$(echo "$2" | tr ',' ' '); shift 2 ;;
+        -l) 
+            # 验证 CIDR 格式
+            for subnet in $(echo "$2" | tr ',' ' '); do
+                if ! [[ "$subnet" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+                    log_error "无效的网段格式: $subnet (应为 CIDR 格式，如 192.168.1.0/24)"
+                    exit 1
+                fi
+            done
+            LAN_SUBNETS=$(echo "$2" | tr ',' ' ')
+            shift 2 
+            ;;
         -y) SKIP_CONFIRM=true; shift ;;
         -u) UNINSTALL=true; shift ;;
         -h|--help) show_help; exit 0 ;;
@@ -125,6 +135,11 @@ log_info "Network ID: $NETWORK_ID"
 log_step "检查 ZeroTier..."
 if ! command -v zerotier-cli &>/dev/null; then
     log_step "安装 ZeroTier..."
+    log_warn "即将从官方源下载并安装 ZeroTier..."
+    if [ "$SKIP_CONFIRM" != true ]; then
+        read -p "是否继续? (y/N): " confirm
+        [[ ! "$confirm" =~ ^[Yy]$ ]] && log_info "用户取消安装" && exit 0
+    fi
     curl -s https://install.zerotier.com | bash
     systemctl enable zerotier-one
     systemctl start zerotier-one
@@ -138,15 +153,21 @@ fi
 # 加入网络
 log_step "加入网络: $NETWORK_ID"
 zerotier-cli join "$NETWORK_ID" >/dev/null 2>&1 || true
-NODE_ID=$(zerotier-cli info | awk '{print $3}')
+NODE_ID=$(zerotier-cli info 2>/dev/null | awk '{print $3}')
+if [ -z "$NODE_ID" ]; then
+    log_error "无法获取 Node ID，ZeroTier 可能未正确启动"
+    log_error "请检查: sudo systemctl status zerotier-one"
+    exit 1
+fi
 log_info "Node ID: $NODE_ID"
 
 # 尝试自动授权
 if [ -n "$API_TOKEN" ]; then
     log_step "尝试自动授权..."
+    HOSTNAME=$(hostname | tr -d '"' | tr -d "'")
     curl -s -X POST -H "Authorization: token $API_TOKEN" \
         -H "Content-Type: application/json" \
-        -d '{"config":{"authorized":true},"name":"Gateway-'$(hostname)'"}' \
+        -d '{"config":{"authorized":true},"name":"Gateway-'"$HOSTNAME"'"}' \
         "https://api.zerotier.com/api/v1/network/$NETWORK_ID/member/$NODE_ID" >/dev/null 2>&1 || true
     sleep 2
 fi
@@ -188,6 +209,7 @@ PHY_IFACE=$(ip route | grep default | awk '{print $5}' | head -n 1)
 
 if [ -z "$ZT_IFACE" ] || [ -z "$ZT_IP" ] || [ -z "$PHY_IFACE" ]; then
     log_error "无法获取网络信息"
+    log_error "ZT_IFACE: ${ZT_IFACE:-未找到}, ZT_IP: ${ZT_IP:-未找到}, PHY_IFACE: ${PHY_IFACE:-未找到}"
     exit 1
 fi
 
@@ -213,7 +235,8 @@ iptables -D FORWARD -i "$ZT_IFACE" -o "$PHY_IFACE" -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -i "$ZT_IFACE" -o "$PHY_IFACE" -j ACCEPT
 iptables -D FORWARD -i "$PHY_IFACE" -o "$ZT_IFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -i "$PHY_IFACE" -o "$ZT_IFACE" -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -A INPUT -p udp --dport 9993 -j ACCEPT 2>/dev/null || true
+iptables -C INPUT -p udp --dport 9993 -j ACCEPT 2>/dev/null || \
+    iptables -A INPUT -p udp --dport 9993 -j ACCEPT
 log_info "NAT 规则配置完成"
 
 # 配置内网路由
@@ -231,7 +254,11 @@ log_step "保存 iptables 规则..."
 OS=$(cat /etc/os-release | grep ^ID= | cut -d= -f2 | tr -d '"')
 case $OS in
     ubuntu|debian)
-        command -v netfilter-persistent &>/dev/null && netfilter-persistent save 2>/dev/null || true
+        if command -v netfilter-persistent &>/dev/null; then
+            netfilter-persistent save 2>/dev/null || true
+        elif command -v iptables-save &>/dev/null; then
+            iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+        fi
         ;;
     centos|rhel|rocky|alma|fedora)
         service iptables save 2>/dev/null || true
@@ -276,33 +303,45 @@ systemctl enable zerotier-gateway.service
 log_info "启动脚本已创建"
 
 # 自动配置路由
-if [ -n "$API_TOKEN" ] && command -v jq &>/dev/null; then
-    log_step "自动配置路由..."
-    
-    ROUTES=$(curl -s -H "Authorization: token $API_TOKEN" \
-        "https://api.zerotier.com/api/v1/network/$NETWORK_ID" | \
-        jq -c '.config.routes // []')
-    
-    NEW_ROUTES=$(echo "$ROUTES" | jq --arg ip "$ZT_IP" \
-        '. += [{"target": "0.0.0.0/0", "via": $ip}]')
-    
-    if [ -n "$LAN_SUBNETS" ]; then
-        for subnet in $LAN_SUBNETS; do
-            NEW_ROUTES=$(echo "$NEW_ROUTES" | jq --arg subnet "$subnet" --arg ip "$ZT_IP" \
-                '. += [{"target": $subnet, "via": $ip}]')
-        done
+if [ -n "$API_TOKEN" ]; then
+    if ! command -v jq &>/dev/null; then
+        log_warn "未检测到 jq，无法自动配置路由"
+        log_warn "安装 jq:"
+        log_warn "  Ubuntu/Debian: sudo apt-get install jq"
+        log_warn "  CentOS/RHEL:   sudo yum install jq"
+        log_warn "  Fedora:        sudo dnf install jq"
+        echo ""
+        log_warn "安装 jq 后，可运行以下命令手动配置路由:"
+        echo "  curl -X POST -H \"Authorization: token \$API_TOKEN\" \\"
+        echo "    -H \"Content-Type: application/json\" \\"
+        echo "    -d '{\"config\":{\"routes\":[{\"target\":\"0.0.0.0/0\",\"via\":\"$ZT_IP\"}]}}' \\"
+        echo "    \"https://api.zerotier.com/api/v1/network/$NETWORK_ID\""
+    else
+        log_step "自动配置路由..."
+        
+        ROUTES=$(curl -s -H "Authorization: token $API_TOKEN" \
+            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" | \
+            jq -c '.config.routes // []')
+        
+        NEW_ROUTES=$(echo "$ROUTES" | jq --arg ip "$ZT_IP" \
+            '. += [{"target": "0.0.0.0/0", "via": $ip}]')
+        
+        if [ -n "$LAN_SUBNETS" ]; then
+            for subnet in $LAN_SUBNETS; do
+                NEW_ROUTES=$(echo "$NEW_ROUTES" | jq --arg subnet "$subnet" --arg ip "$ZT_IP" \
+                    '. += [{"target": $subnet, "via": $ip}]')
+            done
+        fi
+        
+        FINAL_ROUTES=$(echo "$NEW_ROUTES" | jq 'unique_by(.target)')
+        
+        curl -s -X POST -H "Authorization: token $API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"config":{"routes":'"$FINAL_ROUTES"'}}' \
+            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" >/dev/null 2>&1
+        
+        log_info "路由已自动配置"
     fi
-    
-    FINAL_ROUTES=$(echo "$NEW_ROUTES" | jq 'unique_by(.target)')
-    
-    curl -s -X POST -H "Authorization: token $API_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d '{"config":{"routes":'
-
-"$FINAL_ROUTES"'}}' \
-        "https://api.zerotier.com/api/v1/network/$NETWORK_ID" >/dev/null 2>&1
-    
-    log_info "路由已自动配置"
 fi
 
 # 保存配置
@@ -315,6 +354,16 @@ PHY_IFACE=$PHY_IFACE
 LAN_SUBNETS="$LAN_SUBNETS"
 INSTALL_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 EOF
+
+# 测试网络连通性
+log_step "测试网络连通性..."
+if ping -c 2 -W 3 8.8.8.8 &>/dev/null; then
+    log_info "网络连通性正常"
+elif ping -c 2 -W 3 1.1.1.1 &>/dev/null; then
+    log_info "网络连通性正常"
+else
+    log_warn "无法访问外网，请检查网络配置"
+fi
 
 echo ""
 log_info "═════════════════════════════════════════"
@@ -331,6 +380,11 @@ if [ -z "$API_TOKEN" ]; then
     echo "   添加以下路由 (Managed Routes):"
     echo "   • 0.0.0.0/0 via $ZT_IP  (全局出站)"
     [ -n "$LAN_SUBNETS" ] && for s in $LAN_SUBNETS; do echo "   • $s via $ZT_IP  (内网)"; done
+    echo ""
+elif ! command -v jq &>/dev/null; then
+    echo -e "${YELLOW}提示: 未安装 jq，路由未自动配置${NC}"
+    echo "请手动在 ZeroTier Central 配置路由"
+    echo "https://my.zerotier.com/network/$NETWORK_ID"
     echo ""
 else
     echo -e "${GREEN}✓ 路由已自动配置${NC}"
