@@ -1,0 +1,56 @@
+# Logs
+*.log
+/var/log/zerotier-gateway-setup.log
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.*.kate-swp
+.*.sw?
+
+# Test Files
+test/
+tests/
+*.test.sh
+test-*.sh
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Local Configuration
+config.local
+*.local
+.env
+.env.local
+
+# Build/Distribution
+dist/
+build/
+*.tar.gz
+*.zip
+
+# System Configuration Backups
+iptables-backup.rules
+zerotier-one-backup/
+*.conf.bak
+
+# Documentation Build
+docs/_build/
+site/
