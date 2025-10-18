@@ -2,7 +2,7 @@
 
 ################################################################################
 # ZeroTier Linux 网关一键配置脚本 (智能增强版)
-# 版本: 1.2.1 - 优化进度显示和用户体验
+# 版本: 1.2.4 - 修复 Ubuntu 25 兼容性问题
 # 作者: rockyshi1993
 # 日期: 2025-10-18
 ################################################################################
@@ -37,6 +37,91 @@ log_info() { echo -e "${GREEN}[✓]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 log_error() { echo -e "${RED}[✗]${NC} $1"; }
 log_step() { echo -e "${BLUE}[▶]${NC} $1"; }
+
+# 安全的 API 请求函数
+zerotier_api_request() {
+    local method="$1"
+    local endpoint="$2"
+    local data="$3"
+    local max_retries=3
+    local timeout=30
+
+    if [ -z "$API_TOKEN" ]; then
+        log_error "API Token 未设置"
+        return 1
+    fi
+
+    for retry in $(seq 1 $max_retries); do
+        local response
+        local http_code
+
+        if [ -n "$data" ]; then
+            response=$(curl -s --max-time "$timeout" \
+                -w "\n%{http_code}" \
+                -X "$method" \
+                -H "Authorization: token $API_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$data" \
+                "https://api.zerotier.com/api/v1/$endpoint" 2>&1)
+        else
+            response=$(curl -s --max-time "$timeout" \
+                -w "\n%{http_code}" \
+                -X "$method" \
+                -H "Authorization: token $API_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.zerotier.com/api/v1/$endpoint" 2>&1)
+        fi
+
+        http_code=$(echo "$response" | tail -1)
+        local body=$(echo "$response" | sed '$d')
+
+        if [ "$http_code" = "200" ]; then
+            echo "$body"
+            return 0
+        elif [ "$retry" -lt "$max_retries" ]; then
+            log_warn "API 请求失败 (HTTP $http_code)，重试 $retry/$max_retries..."
+            sleep 2
+        else
+            log_error "API 请求失败 (HTTP $http_code): $body"
+            return 1
+        fi
+    done
+
+    return 1
+}
+
+# 严格的 CIDR 验证函数
+validate_cidr() {
+    local cidr="$1"
+
+    # 验证格式
+    if ! [[ "$cidr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+        return 1
+    fi
+
+    # 验证 IP 范围
+    local ip=$(echo "$cidr" | cut -d'/' -f1)
+    local mask=$(echo "$cidr" | cut -d'/' -f2)
+
+    IFS='.' read -ra octets <<< "$ip"
+    for octet in "${octets[@]}"; do
+        # 检查是否为数字
+        if ! [[ "$octet" =~ ^[0-9]+$ ]]; then
+            return 1
+        fi
+        # 检查范围
+        if [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+            return 1
+        fi
+    done
+
+    # 验证掩码范围
+    if [ "$mask" -lt 0 ] || [ "$mask" -gt 32 ]; then
+        return 1
+    fi
+
+    return 0
+}
 
 # 进度显示函数
 show_progress() {
@@ -81,7 +166,7 @@ check_root() {
 
 show_help() {
     cat << 'EOF'
-ZeroTier Gateway Setup Script v1.2.2 (优化版)
+ZeroTier Gateway Setup Script v1.2.4 (修复版)
 
 用法: sudo bash zerotier-gateway-setup.sh [选项]
 
@@ -105,12 +190,14 @@ ZeroTier Gateway Setup Script v1.2.2 (优化版)
     # 完全自动化（API Token + 自动检测 + 跳过确认）
     sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -t YOUR_TOKEN -a -y
 
-新功能 (v1.2.1):
+新功能 (v1.2.4):
     ✨ 详细的实时进度显示
     ✨ 每步骤耗时统计
     ✨ 可视化进度条（50字符宽）
     ✨ 彩色输出增强可读性
     ✨ 优化确认流程
+    🐛 修复 Ubuntu 25 兼容性问题
+    🐛 移除 bc 依赖，使用纯 bash 计算
 
 项目: https://github.com/rockyshi1993/zerotier-gateway
 EOF
@@ -137,7 +224,7 @@ backup_config() {
     
     # 备份路由表
     echo -n "  正在备份路由表... "
-    ip route save > "$BACKUP_DIR/routes-${timestamp}.dump" 2>/dev/null || true
+    ip route show > "$BACKUP_DIR/routes-${timestamp}.txt" 2>/dev/null || true
     echo -e "${GREEN}完成${NC}"
     
     # 备份现有配置文件
@@ -150,7 +237,7 @@ backup_config() {
     # 清理旧备份（保留最近5个）
     echo -n "  正在清理旧备份... "
     find "$BACKUP_DIR" -name "iptables-*.rules" -type f | sort -r | tail -n +6 | xargs rm -f 2>/dev/null || true
-    find "$BACKUP_DIR" -name "routes-*.dump" -type f | sort -r | tail -n +6 | xargs rm -f 2>/dev/null || true
+    find "$BACKUP_DIR" -name "routes-*.txt" -type f | sort -r | tail -n +6 | xargs rm -f 2>/dev/null || true
     echo -e "${GREEN}完成${NC}"
     
     step_done "配置备份完成"
@@ -190,13 +277,11 @@ auto_detect_lan_subnets() {
     
     local detected_subnets=""
     local temp_file=$(mktemp)
-    local count=0
     
     echo "  正在扫描网络接口..."
     
-    # 获取所有非回环、非 ZeroTier 的私有 IP 网段
-    ip -4 addr show | grep "inet " | grep -v "127.0.0.1" | grep -v "zt" | \
-        awk '{print $2}' | while read -r cidr; do
+    # 获取所有非回环、非 ZeroTier 的私有 IP 网段（修复子shell问题）
+    while read -r cidr; do
         local ip=$(echo "$cidr" | cut -d'/' -f1)
         local mask=$(echo "$cidr" | cut -d'/' -f2)
         
@@ -212,15 +297,15 @@ auto_detect_lan_subnets() {
                 local network=$(ipcalc -n "$cidr" 2>/dev/null | grep Network | awk '{print $2}')
                 if [ -n "$network" ]; then
                     echo "$network" >> "$temp_file"
-                    ((count++))
                 fi
             fi
         fi
-    done
+    done < <(ip -4 addr show | grep "inet " | grep -v "127.0.0.1" | grep -v "zt" | awk '{print $2}')
     
     # 去重并排序
     if [ -f "$temp_file" ] && [ -s "$temp_file" ]; then
         detected_subnets=$(sort -u "$temp_file" | tr '\n' ' ')
+        local count=$(echo "$detected_subnets" | wc -w)
         rm -f "$temp_file"
         
         if [ -n "$detected_subnets" ]; then
@@ -431,9 +516,16 @@ while [[ $# -gt 0 ]]; do
         -n) NETWORK_ID="$2"; shift 2 ;;
         -t) API_TOKEN="$2"; shift 2 ;;
         -l) 
+            # 使用新的严格验证函数
             for subnet in $(echo "$2" | tr ',' ' '); do
-                if ! [[ "$subnet" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+                if ! validate_cidr "$subnet"; then
                     log_error "无效的网段格式: $subnet"
+                    echo ""
+                    echo -e "${YELLOW}CIDR 格式要求:${NC}"
+                    echo "  • IP 地址: 每段必须是 0-255"
+                    echo "  • 子网掩码: 必须是 0-32"
+                    echo "  • 示例: 192.168.1.0/24"
+                    echo ""
                     exit 1
                 fi
             done
@@ -661,9 +753,11 @@ pre_install_check() {
         echo -e "  ${GREEN}✓${NC} 网络连接: 正常"
     fi
     
-    # 4. 检查系统负载
+    # 4. 检查系统负载（使用纯bash避免bc依赖）
     local load_avg=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
-    if (( $(echo "$load_avg > 5.0" | bc -l) )); then
+    local load_int=$(echo "$load_avg" | cut -d'.' -f1)
+    # 仅当能解析为整数且>=5时告警
+    if [ -n "$load_int" ] && [ "$load_int" -ge 5 ] 2>/dev/null; then
         echo -e "  ${YELLOW}⚠${NC} 系统负载: 较高 (load: $load_avg)"
         ((warnings++))
     else
@@ -745,7 +839,7 @@ clear
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.2${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.4${NC}               ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${CYAN}║${NC}  Network ID: ${YELLOW}$NETWORK_ID${NC}                         ${CYAN}║${NC}"
@@ -894,10 +988,42 @@ echo "  等待网络接口就绪..."
 sleep 2
 
 echo -n "  正在获取 ZeroTier 接口... "
-ZT_IFACE=$(ip addr | grep -oP 'zt\w+' | head -n 1)
+# 优先通过网络 ID 获取对应的接口
+ZT_IFACE=""
+for i in {1..10}; do
+    # 尝试从 zerotier-cli 获取指定网络的接口
+    if command -v zerotier-cli &>/dev/null; then
+        ZT_IFACE=$(zerotier-cli listnetworks 2>/dev/null | \
+            grep "$NETWORK_ID" | \
+            awk '{for(i=1;i<=NF;i++) if($i ~ /^zt/) print $i}' | \
+            head -n 1)
+    fi
+
+    # 如果没有获取到，尝试从 ip addr 获取
+    if [ -z "$ZT_IFACE" ]; then
+        ZT_IFACE=$(ip addr 2>/dev/null | grep -oP 'zt\w+' | head -n 1)
+    fi
+
+    if [ -n "$ZT_IFACE" ]; then
+        break
+    fi
+
+    sleep 1
+done
+
 if [ -z "$ZT_IFACE" ]; then
     echo -e "${RED}失败${NC}"
     log_error "未找到 ZeroTier 接口"
+    echo ""
+    echo -e "${YELLOW}可能的原因:${NC}"
+    echo "  1. ZeroTier 服务未启动"
+    echo "  2. 未成功加入网络"
+    echo "  3. 网络未授权此设备"
+    echo ""
+    echo -e "${CYAN}建议操作:${NC}"
+    echo "  1. 检查服务: systemctl status zerotier-one"
+    echo "  2. 查看网络: zerotier-cli listnetworks"
+    echo "  3. 检查授权: https://my.zerotier.com/network/$NETWORK_ID"
     exit 1
 fi
 echo -e "${GREEN}$ZT_IFACE${NC}"
@@ -1042,10 +1168,15 @@ if [ -n "$API_TOKEN" ]; then
         echo ""
         echo -n "正在使用 API Token 自动配置路由... "
         
-        ROUTES=$(curl -s -H "Authorization: token $API_TOKEN" \
-            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" | \
-            jq -c '.config.routes // []')
-        
+        # 获取当前路由配置
+        local current_routes=$(zerotier_api_request "GET" "network/$NETWORK_ID" 2>/dev/null | jq -c '.config.routes // []' 2>/dev/null)
+
+        if [ -n "$current_routes" ]; then
+            ROUTES="$current_routes"
+        else
+            ROUTES="[]"
+        fi
+
         NEW_ROUTES=$(echo "$ROUTES" | jq --arg ip "$ZT_IP" \
             '. += [{"target": "0.0.0.0/0", "via": $ip}]')
         
@@ -1058,15 +1189,16 @@ if [ -n "$API_TOKEN" ]; then
         
         FINAL_ROUTES=$(echo "$NEW_ROUTES" | jq 'unique_by(.target)')
         
-        if curl -s -X POST -H "Authorization: token $API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"config":{"routes":'"$FINAL_ROUTES"'}}' \
-            "https://api.zerotier.com/api/v1/network/$NETWORK_ID" >/dev/null 2>&1; then
+        local route_data='{"config":{"routes":'"$FINAL_ROUTES"'}}'
+        if zerotier_api_request "POST" "network/$NETWORK_ID" "$route_data" >/dev/null 2>&1; then
             echo -e "${GREEN}完成${NC}"
         else
             echo -e "${YELLOW}失败${NC}"
             log_warn "自动路由配置失败，请手动配置"
         fi
+
+        # 安全提示：清除 API Token
+        log_info "API Token 已使用完毕，不会保存到配置文件"
     else
         echo ""
         log_warn "未安装 jq，无法自动配置路由"
@@ -1074,10 +1206,11 @@ if [ -n "$API_TOKEN" ]; then
     fi
 fi
 
-# 保存配置
+# 保存配置（不包含 API Token）
 cat > /etc/zerotier-gateway.conf << EOF
 # ZeroTier Gateway 配置文件
-VERSION=1.2.2
+# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
+VERSION=1.2.4
 NETWORK_ID=$NETWORK_ID
 NODE_ID=$NODE_ID
 ZT_IFACE=$ZT_IFACE
@@ -1086,6 +1219,7 @@ PHY_IFACE=$PHY_IFACE
 LAN_SUBNETS="$LAN_SUBNETS"
 INSTALL_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP_DIR=$BACKUP_DIR
+# 注意: API Token 不会保存在此文件中（安全考虑）
 EOF
 
 # 设置配置文件权限（安全加固）
