@@ -1,0 +1,3 @@
+# Complete bash script for ZeroTier gateway setup with VPN, LAN access, and optional API token support
+
+# Your script here...
