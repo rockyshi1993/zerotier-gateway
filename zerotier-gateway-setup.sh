@@ -9,6 +9,9 @@
 
 set -e
 
+# Codestral 建议: 在脚本开头就重定向输出到终端，确保所有交互式输出可见
+exec 1>/dev/tty 2>&1
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -32,11 +35,11 @@ TOTAL_STEPS=12
 CURRENT_STEP=0
 STEP_START_TIME=0
 
-# 日志函数
-log_info() { echo -e "${GREEN}[✓]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-log_error() { echo -e "${RED}[✗]${NC} $1"; }
-log_step() { echo -e "${BLUE}[▶]${NC} $1"; }
+# 日志函数（确保返回状态为 0，避免 set -e 导致脚本提前退出）
+log_info() { echo -e "${GREEN}[✓]${NC} $1" || true; }
+log_warn() { echo -e "${YELLOW}[!]${NC} $1" || true; }
+log_error() { echo -e "${RED}[✗]${NC} $1" >&2 || true; }
+log_step() { echo -e "${BLUE}[▶]${NC} $1" || true; }
 
 # 安全的 API 请求函数
 zerotier_api_request() {
@@ -161,7 +164,10 @@ step_done() {
 }
 
 check_root() {
-    [[ $EUID -ne 0 ]] && log_error "需要 root 权限，请使用: sudo bash $0" && exit 1
+    if [[ $EUID -ne 0 ]]; then
+        log_error "需要 root 权限，请使用: sudo bash $0"
+        exit 1
+    fi
 }
 
 show_help() {
@@ -801,11 +807,22 @@ pre_install_check() {
         log_warn "预安装检查通过但有 $warnings 个警告"
         echo ""
         if [ "$SKIP_CONFIRM" != true ]; then
+            echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "${YELLOW}检测到警告，这些通常不会影响安装${NC}"
+            echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo ""
+            
+            # 简单直接的 read，不需要任何重定向
             read -p "是否继续安装? (Y/n): " confirm
+            echo ""
+            
             if [[ "$confirm" =~ ^[Nn]$ ]]; then
                 log_info "用户取消安装"
                 exit 0
             fi
+            log_info "用户确认继续安装"
+        else
+            log_info "检测到 $warnings 个警告，但已指定 -y 参数，自动继续安装..."
         fi
     else
         echo -e "${GREEN}✓ 预安装检查全部通过${NC}"
