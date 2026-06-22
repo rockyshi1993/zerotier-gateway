@@ -1,0 +1,22 @@
+{
+  "default": "proxy",
+  "direct": {
+    "domains": ["localhost"],
+    "domainSuffixes": [".local"],
+    "ipCidrs": [
+      "10.246.77.0/24",
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16"
+    ],
+    "processGroups": ["remote-tools"],
+    "processNames": ["steam.exe", "WeChat.exe"],
+    "processPaths": [],
+    "processPathRegex": [".*(RemoteTool|RemoteControl|Relay|Helper).*\\.exe$"]
+  },
+  "proxy": {
+    "type": "socks",
+    "server": "10.246.77.1",
+    "port": 10808
+  }
+}

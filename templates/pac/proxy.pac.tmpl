@@ -1,0 +1,34 @@
+function FindProxyForURL(url, host) {
+  var proxy = "PROXY ${PROXY_HOST}:${PROXY_PORT}; SOCKS5 ${PROXY_HOST}:${PROXY_PORT}";
+  var directHosts = ${DIRECT_HOSTS_JSON};
+  var directSuffixes = ${DIRECT_SUFFIXES_JSON};
+  var directNets = ${DIRECT_NETS_JSON};
+
+  if (isPlainHostName(host)) {
+    return "DIRECT";
+  }
+
+  for (var i = 0; i < directHosts.length; i++) {
+    if (shExpMatch(host, directHosts[i])) {
+      return "DIRECT";
+    }
+  }
+
+  for (var j = 0; j < directSuffixes.length; j++) {
+    if (dnsDomainIs(host, directSuffixes[j])) {
+      return "DIRECT";
+    }
+  }
+
+  var ip = dnsResolve(host);
+  if (ip) {
+    for (var k = 0; k < directNets.length; k++) {
+      var rule = directNets[k];
+      if (isInNet(ip, rule.address, rule.mask)) {
+        return "DIRECT";
+      }
+    }
+  }
+
+  return proxy;
+}

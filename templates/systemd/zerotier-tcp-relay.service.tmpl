@@ -1,0 +1,14 @@
+[Unit]
+Description=ZeroTier Gateway optional TCP relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ztg-relay --listen :${RELAY_PORT}
+Restart=on-failure
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target

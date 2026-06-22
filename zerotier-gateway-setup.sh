@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Deprecated: this legacy all-in-one gateway script is kept for historical
+# compatibility. The current workflow uses scripts/ubuntu, scripts/windows,
+# config, templates, and docs.
+
 ################################################################################
 # ZeroTier Linux 网关一键配置脚本 (智能增强版)
 # 版本: 1.2.4 - 修复 Ubuntu 25 兼容性问题

@@ -1,0 +1,14 @@
+[Unit]
+Description=ZeroTier Gateway private proxy
+After=network-online.target zerotier-one.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sing-box run -c /etc/zerotier-gateway/sing-box-server.json
+Restart=on-failure
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target

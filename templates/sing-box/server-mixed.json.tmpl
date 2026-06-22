@@ -1,0 +1,26 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "zt-private-proxy",
+      "listen": "${PROXY_BIND_IP}",
+      "listen_port": ${PROXY_PORT},
+      "users": [
+        {
+          "username": "${PROXY_USERNAME}",
+          "password": "${PROXY_PASSWORD}"
+        }
+      ]
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}

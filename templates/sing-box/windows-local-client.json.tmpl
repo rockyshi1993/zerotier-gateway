@@ -1,0 +1,32 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "local-mixed",
+      "listen": "127.0.0.1",
+      "listen_port": ${LOCAL_PROXY_PORT}
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "socks",
+      "tag": "ubuntu-proxy",
+      "server": "${UBUNTU_ZT_IP}",
+      "server_port": ${PROXY_PORT},
+      "username": "${PROXY_USERNAME}",
+      "password": "${PROXY_PASSWORD}"
+    }
+  ],
+  "route": {
+    "rules": ${ROUTE_RULES_JSON},
+    "final": "ubuntu-proxy"
+  }
+}

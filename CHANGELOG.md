@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+### Added
+- 新增轻量重构入口：`config/`、`templates/`、`scripts/ubuntu/`、`scripts/windows/`、`docs/`、`tests/`、`artifacts/`。
+- 新增 Ubuntu 私有 HTTP/SOCKS5 代理脚本骨架，默认读取项目根目录 `.env`。
+- 新增 Windows 入网、防火墙预览、网络诊断、代理测试、PAC 生成和本地规则客户端配置生成脚本。
+- 新增低延时远程、私有代理、代理排除规则、中转兜底、排错和回滚文档。
+
+### Changed
+- README 新增当前推荐入口：一个 ZeroTier 私有局域网、双向远程、Ubuntu 私有代理、可选中转。
+- README 当前主入口调整为中文优先，并将旧版 README 降级为历史参考折叠区。
+- `--env <path>` / `-Env <path>` 调整为覆盖参数；普通主流程默认不需要传 `.env` 路径。
+- 旧 `zerotier-gateway-setup.sh` 标记为 deprecated，保留历史兼容，不再作为新功能主实现。
+
+### Fixed
+- Ubuntu `.env` 读取改为安全解析，避免把配置文件当作 shell 脚本执行。
+- 模板渲染改为按模板占位符替换，省略可选配置时也能使用脚本默认值。
+- PAC 生成支持任意 `DIRECT_IP_CIDRS` 网段转换，不再只处理固定私网网段。
+- Windows 本地客户端规则修正进程组数组合并，并显式输出 sing-box `action: route`。
+- Windows 防火墙应用规则前会清理同名项目规则，避免重复创建。
+
 ## [1.2.2] - 2025-01-23
 
 ### Added

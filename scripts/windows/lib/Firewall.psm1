@@ -1,0 +1,47 @@
+Set-StrictMode -Version Latest
+
+function Get-ZtgRemotePeerIp {
+  param(
+    [Parameter(Mandatory)][System.Collections.IDictionary]$Config,
+    [Parameter(Mandatory)][ValidateSet('Home','Work')]$Role
+  )
+  if ($Role -eq 'Home') {
+    return $Config['WORK_PC_ZT_IP']
+  }
+  return $Config['HOME_PC_ZT_IP']
+}
+
+function New-ZtgFirewallPlan {
+  param(
+    [Parameter(Mandatory)][System.Collections.IDictionary]$Config,
+    [Parameter(Mandatory)][ValidateSet('Home','Work')]$Role
+  )
+
+  $remoteIp = Get-ZtgRemotePeerIp -Config $Config -Role $Role
+  $ports = @([string]$Config['REMOTE_PORTS'] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  foreach ($port in $ports) {
+    [pscustomobject]@{
+      DisplayName = "ZT Gateway Remote Inbound $Role $port"
+      Direction = 'Inbound'
+      Protocol = 'TCP'
+      LocalPort = $port
+      RemoteAddress = $remoteIp
+      Action = 'Allow'
+    }
+  }
+}
+
+function Apply-ZtgFirewallPlan {
+  param([Parameter(Mandatory)]$Plan)
+
+  foreach ($rule in $Plan) {
+    Get-NetFirewallRule -DisplayName $rule.DisplayName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    New-NetFirewallRule -DisplayName $rule.DisplayName -Direction Inbound -Protocol $rule.Protocol -LocalPort $rule.LocalPort -RemoteAddress $rule.RemoteAddress -Action Allow | Out-Null
+  }
+}
+
+function Remove-ZtgFirewallRules {
+  Get-NetFirewallRule -DisplayName 'ZT Gateway Remote Inbound *' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+}
+
+Export-ModuleMember -Function Get-ZtgRemotePeerIp,New-ZtgFirewallPlan,Apply-ZtgFirewallPlan,Remove-ZtgFirewallRules

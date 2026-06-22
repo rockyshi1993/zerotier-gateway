@@ -21,11 +21,8 @@ Thumbs.db
 .*.kate-swp
 .*.sw?
 
-# Test Files
-test/
-tests/
-*.test.sh
-test-*.sh
+# Test output
+test-output/
 
 # Temporary Files
 *.tmp
@@ -54,3 +51,7 @@ zerotier-one-backup/
 # Documentation Build
 docs/_build/
 site/
+
+# Generated runtime artifacts
+artifacts/*
+!artifacts/.gitkeep

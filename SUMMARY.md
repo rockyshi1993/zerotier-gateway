@@ -1,4 +1,8 @@
-# ZeroTier Gateway 项目分析与测试总结
+# ZeroTier Gateway 项目总结
+
+> 当前主线已重构为：ZeroTier 私有局域网 + 双向低延时远程 + Ubuntu 私有 HTTP/SOCKS5 代理 + 可选代理排除规则 + 可选中转。下面的旧项目分析保留为历史记录。
+
+# 历史分析与测试总结
 
 ## 📊 项目概况
 
