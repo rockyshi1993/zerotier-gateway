@@ -1,6 +1,6 @@
 # ZeroTier Gateway
 
-> 当前主线：用一个 ZeroTier 私有局域网打通家里电脑、公司电脑和 Ubuntu 节点；远程访问优先走 ZeroTier 直连，代理上网只让需要的软件走 Ubuntu 私有 HTTP/SOCKS5 代理，必要时再启用中转兜底。
+这份文档教你完成三件事：让家里电脑和公司电脑互相远程、在 Ubuntu 上搭一个只给指定软件使用的私有代理、按需设置哪些流量不走代理。
 
 ## 目录导航
 
@@ -10,16 +10,13 @@
 - [完整流程](#完整流程)
 - [常见选择](#常见选择)
 - [文档入口](#文档入口)
-- [旧脚本说明](#旧脚本说明)
 
 ## 适合什么场景
 
 - 家里电脑和公司电脑需要互相远程，目标是低延迟、少折腾。
 - 某些软件需要通过 Ubuntu 节点代理上网，但不想把整台电脑都改成全局代理。
 - 需要排除指定 IP、域名或进程不走代理。
-- ZeroTier 直连效果不好时，希望有一个可选的中转方案。
-
-首版不做复杂 VPN 平台，不默认配置出口节点，不做自建控制器、Moon/私有根或多网络编排。
+- ZeroTier 直连效果不好时，希望有一个备用中转方案。
 
 ## 最终会得到什么
 
@@ -27,7 +24,7 @@
 
 | 设备 | 作用 | 推荐 ZeroTier IP |
 |---|---|---|
-| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，必要时提供中转 | `10.246.77.1` |
+| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选中转 | `10.246.77.1` |
 | 家里 Windows 电脑 | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
 | 公司 Windows 电脑 | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
@@ -214,7 +211,7 @@ DIRECT_PROCESS_PATH_REGEX=
 
 输出文件在 `artifacts/windows-local-client.json`。本仓库负责生成规则文件，实际接管进程流量需要导入你正在使用的本地规则客户端。
 
-### 8. 直连差时再启用中转
+### 8. 远程直连不稳定时，再开启中转
 
 只有家里和公司长期无法直连，或者远程延迟明显不稳定时，再考虑中转。
 
@@ -251,7 +248,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 | 只给浏览器或某个软件代理 | 完成第 6 步 |
 | 排除公司内网、局域网或指定域名 | 做第 7 步里的 PAC |
 | 排除某个软件或多进程软件 | 做第 7 步里的本地规则客户端配置 |
-| 远程延迟高、直连不稳定 | 再看第 8 步中转 |
+| 远程延迟高、直连不稳定 | 再看第 8 步 |
 | 安装失败或连不通 | 看 [故障排查](docs/troubleshooting.md) |
 
 ## 文档入口
@@ -262,21 +259,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 - [远程访问](docs/remote.md)
 - [代理上网](docs/proxy.md)
 - [代理排除规则](docs/proxy-rules.md)
-- [中转兜底](docs/relay.md)
+- [中转](docs/relay.md)
 - [故障排查](docs/troubleshooting.md)
 - [安全说明](docs/security.md)
 - [回滚与卸载](docs/rollback.md)
-
-## 旧脚本说明
-
-`zerotier-gateway-setup.sh` 仅保留为历史兼容入口，不是当前“低延迟远程 + 私有代理 + 可选中转”主流程。新用户请优先使用上面的 `config/`、`scripts/ubuntu/`、`scripts/windows/` 和 `docs/`。
-
----
-
-<details>
-<summary>旧版说明（历史参考，不作为当前主线）</summary>
-
-旧版一键脚本 `zerotier-gateway-setup.sh` 仍保留在仓库中，主要用于历史兼容和回溯。当前新用户请优先阅读上方快速开始和 `docs/` 下的中文文档。
-
-如需查看旧版完整说明，请通过 Git 历史回看本次中文化之前的 `README.md`。
-</details>
