@@ -1,20 +1,20 @@
-# Security Notes
+# 安全说明
 
-## Required Defaults
+## 必须保持的默认策略
 
-- ZeroTier network should be private.
-- New devices must be authorized manually.
-- Proxy authentication must be enabled.
-- Proxy must listen on the Ubuntu ZeroTier IP, not `0.0.0.0`.
-- Remote ports must not be exposed to the public internet.
-- `.env` must not be committed.
+- ZeroTier 网络应保持为私有网络。
+- 新设备必须手动授权。
+- 代理必须启用账号密码认证。
+- 代理必须监听 Ubuntu 的 ZeroTier IP，不要监听 `0.0.0.0`。
+- 远程控制端口不要暴露到公网。
+- `.env` 不要提交到仓库。
 
-## Public Exposure
+## 公网暴露
 
-The proxy endpoint is intended for ZeroTier private access only:
+代理入口只应该供 ZeroTier 私有网络内访问：
 
 ```text
 10.246.77.1:10808
 ```
 
-Cloud firewalls and OS firewalls should not expose this port publicly.
+云防火墙和系统防火墙都不要把这个端口开放到公网。

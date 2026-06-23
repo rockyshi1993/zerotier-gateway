@@ -35,7 +35,7 @@ pre_install_check() {
     echo -e "${CYAN}║${NC}               ${YELLOW}安装前检查${NC}                                      ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     # 检查互联网连接
     echo -n "  检查网络连接... "
     if ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; then
@@ -46,7 +46,7 @@ pre_install_check() {
     else
         echo -e "${GREEN}正常${NC}"
     fi
-    
+
     # 检查 ZeroTier 是否已安装
     if command -v zerotier-cli &>/dev/null; then
         echo -e "  ${YELLOW}⚠${NC}  检测到已安装 ZeroTier"
@@ -55,7 +55,7 @@ pre_install_check() {
             echo "     当前已加入 $networks 个网络"
         fi
     fi
-    
+
     # 显示将要执行的操作
     echo ""
     echo -e "${YELLOW}此脚本将执行以下操作:${NC}"
@@ -67,7 +67,7 @@ pre_install_check() {
     echo "  6. 修改系统配置 (sysctl)"
     [ -n "$LAN_SUBNETS" ] && echo "  7. 配置内网路由: $LAN_SUBNETS"
     echo ""
-    
+
     # 风险提示
     echo -e "${RED}⚠  重要提示:${NC}"
     echo "  • 此操作会修改网络配置和防火墙规则"
@@ -75,7 +75,7 @@ pre_install_check() {
     echo "  • 建议在测试环境或有控制台访问权限的服务器上操作"
     echo "  • 安装前会自动备份配置，失败时可回滚"
     echo ""
-    
+
     # 预估时间
     echo -e "${CYAN}预计安装时间: 3-5 分钟${NC}"
     echo ""
@@ -86,7 +86,7 @@ pre_install_check() {
 
 ---
 
-##### 1.2 缺少干运行模式（Dry Run）
+##### 1.2 缺少干运行模式
 **问题**:
 - 无法预览将要执行的操作
 - 用户必须实际执行才能知道会发生什么
@@ -97,8 +97,8 @@ pre_install_check() {
 show_help() {
     cat << 'EOF'
 选项:
-    -n <ID>     ZeroTier Network ID (16位十六进制，必填)
-    -t <TOKEN>  API Token (可选，用于自动配置路由)
+    -n <ID>     ZeroTier网络编号(16位十六进制，必填)
+    -t <令牌>接口令牌(可选，用于自动配置路由)
     -l <NETS>   内网网段，逗号分隔
     -a          自动检测内网网段
     -y          跳过所有确认提示
@@ -110,7 +110,7 @@ show_help() {
 示例:
     # 预览安装操作
     sudo bash zerotier-gateway-setup.sh -n xxx -a --dry-run
-    
+
     # 检查环境
     sudo bash zerotier-gateway-setup.sh --check
 EOF
@@ -125,7 +125,7 @@ EOF
 **问题**:
 ```bash
 # 当前错误信息
-log_error "无效的 Network ID (必须是16位十六进制)"
+log_error "无效的网络编号(必须是16位十六进制)"
 
 # 用户可能不知道什么是"十六进制"
 ```
@@ -134,12 +134,12 @@ log_error "无效的 Network ID (必须是16位十六进制)"
 ```bash
 validate_network_id() {
     local id="$1"
-    
+
     if [ -z "$id" ]; then
         cat << 'EOF'
-错误: 未提供 Network ID
+错误: 未提供网络编号
 
-Network ID 是什么？
+网络编号是什么？
   • 16个字符的唯一标识符
   • 只包含数字 0-9 和字母 a-f
   • 示例: 1234567890abcdef
@@ -147,20 +147,20 @@ Network ID 是什么？
 如何获取？
   1. 访问 https://my.zerotier.com
   2. 创建或选择一个网络
-  3. 复制 Network ID（在网络名称下方）
+  3. 复制网络编号（在网络名称下方）
 
 EOF
         return 1
     fi
-    
+
     if [[ ! "$id" =~ ^[a-f0-9]{16}$ ]]; then
         cat << EOF
-错误: Network ID 格式不正确
+错误:网络编号格式不正确
 
 您输入的: $id
 长度: ${#id} 个字符（需要 16 个）
 
-Network ID 必须：
+网络编号必须：
   ✗ 正好 16 个字符
   ✗ 只包含小写字母 a-f 和数字 0-9
   ✗ 不能包含空格或其他字符
@@ -173,7 +173,7 @@ Network ID 必须：
 EOF
         return 1
     fi
-    
+
     return 0
 }
 ```
@@ -209,7 +209,7 @@ check_incomplete_install() {
     if [ -f "$state_file" ]; then
         source "$state_file"
         local elapsed=$(($(date +%s) - INSTALL_TIME))
-        
+
         if [ "$elapsed" -lt 3600 ]; then  # 1小时内
             echo -e "${YELLOW}检测到未完成的安装 (${elapsed}秒前)${NC}"
             echo "  进度: $CURRENT_STEP/$TOTAL_STEPS"
@@ -280,7 +280,7 @@ intelligent_network_detection() {
     echo ""
     echo -e "${CYAN}正在分析网络环境...${NC}"
     echo ""
-    
+
     # 检测服务器类型
     local server_type="unknown"
     if grep -qi "alibaba" /sys/class/dmi/id/product_name 2>/dev/null; then
@@ -290,16 +290,16 @@ intelligent_network_detection() {
     elif [ -f /etc/cloud/build.info ]; then
         server_type="cloud"
     fi
-    
+
     # 检测网络拓扑
     local has_private_ip=false
     local has_public_ip=false
     local private_nets=()
-    
+
     # 分析所有网络接口
     while IFS= read -r line; do
         local ip=$(echo "$line" | awk '{print $2}' | cut -d'/' -f1)
-        
+
         # 判断公网/私网
         if [[ "$ip" =~ ^192\.168\. ]] || [[ "$ip" =~ ^10\. ]] || [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
             has_private_ip=true
@@ -308,17 +308,17 @@ intelligent_network_detection() {
             has_public_ip=true
         fi
     done < <(ip -4 addr | grep "inet " | grep -v "127.0.0.1")
-    
+
     # 智能推荐
     echo -e "${GREEN}网络环境分析结果:${NC}"
     [ "$server_type" != "unknown" ] && echo "  服务器类型: $server_type"
     echo "  公网 IP: $([ "$has_public_ip" = true ] && echo "是" || echo "否")"
     echo "  私网 IP: $([ "$has_private_ip" = true ] && echo "是" || echo "否")"
     echo ""
-    
+
     # 推荐配置
     echo -e "${YELLOW}推荐配置:${NC}"
-    
+
     if [ "$has_public_ip" = true ] && [ "$has_private_ip" = false ]; then
         echo "  • 场景: 纯公网服务器（如 VPS）"
         echo "  • 建议: 仅配置 VPN 全局出站"
@@ -336,7 +336,7 @@ intelligent_network_detection() {
         echo "  • 场景: 内网服务器"
         echo "  • 建议: 配置内网穿透"
     fi
-    
+
     echo ""
     read -p "是否使用推荐配置? (Y/n): " confirm
     # ... 自动应用配置
@@ -361,7 +361,7 @@ fi
 ```bash
 smart_conflict_resolution() {
     local conflicts=()
-    
+
     # 检测 firewalld
     if systemctl is-active --quiet firewalld 2>/dev/null; then
         echo -e "${YELLOW}检测到 firewalld 正在运行${NC}"
@@ -376,7 +376,7 @@ smart_conflict_resolution() {
         echo ""
         echo "  3. 继续安装（可能冲突）"
         echo ""
-        
+
         read -p "选择 (1/2/3): " choice
         case $choice in
             1)
@@ -396,7 +396,7 @@ smart_conflict_resolution() {
                 ;;
         esac
     fi
-    
+
     # 检测其他 VPN
     if ip link show 2>/dev/null | grep -qE "tun[0-9]+|wg[0-9]+"; then
         echo -e "${YELLOW}检测到其他 VPN 连接${NC}"
@@ -428,10 +428,10 @@ show_performance_tips() {
     echo -e "${CYAN}║${NC}                  ${YELLOW}性能优化建议${NC}                              ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     # 检测网络延迟
     local latency=$(ping -c 3 8.8.8.8 2>/dev/null | tail -1 | awk -F '/' '{print $5}' | cut -d '.' -f1)
-    
+
     if [ -n "$latency" ]; then
         if [ "$latency" -gt 100 ]; then
             echo -e "${YELLOW}检测到较高延迟 (${latency}ms)${NC}"
@@ -447,7 +447,7 @@ show_performance_tips() {
             echo ""
         fi
     fi
-    
+
     # 检测带宽
     echo "性能测试命令:"
     echo "  • 测速: curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -"
@@ -479,15 +479,15 @@ show_status() {
     echo -e "${CYAN}║${NC}              ZeroTier Gateway 状态                            ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     # 检查配置文件
     if [ ! -f /etc/zerotier-gateway.conf ]; then
         log_error "未找到配置文件，Gateway 可能未安装"
         exit 1
     fi
-    
+
     source /etc/zerotier-gateway.conf
-    
+
     # ZeroTier 服务状态
     echo -e "${YELLOW}ZeroTier 服务:${NC}"
     if systemctl is-active --quiet zerotier-one; then
@@ -495,7 +495,7 @@ show_status() {
     else
         echo -e "  状态: ${RED}已停止${NC}"
     fi
-    
+
     # Gateway 服务状态
     echo ""
     echo -e "${YELLOW}Gateway 服务:${NC}"
@@ -504,14 +504,14 @@ show_status() {
     else
         echo -e "  状态: ${RED}已停止${NC}"
     fi
-    
+
     # 网络连接状态
     echo ""
     echo -e "${YELLOW}网络连接:${NC}"
     zerotier-cli listnetworks | grep -v "200 listnetworks" | while read line; do
         echo "  $line"
     done
-    
+
     # IP 转发状态
     echo ""
     echo -e "${YELLOW}系统配置:${NC}"
@@ -521,16 +521,16 @@ show_status() {
     else
         echo -e "  IP 转发: ${RED}已禁用${NC}"
     fi
-    
+
     # iptables 规则
     echo ""
     echo -e "${YELLOW}防火墙规则:${NC}"
     local nat_count=$(iptables -t nat -L POSTROUTING -n | grep MASQUERADE | wc -l)
     echo "  NAT 规则: $nat_count 条"
-    
+
     local forward_count=$(iptables -L FORWARD -n | grep ACCEPT | wc -l)
     echo "  转发规则: $forward_count 条"
-    
+
     # 网络测试
     echo ""
     echo -e "${YELLOW}连通性测试:${NC}"
@@ -539,17 +539,17 @@ show_status() {
     else
         echo -e "  外网连接: ${RED}异常${NC}"
     fi
-    
+
     # 配置信息
     echo ""
     echo -e "${YELLOW}配置信息:${NC}"
-    echo "  Network ID: $NETWORK_ID"
+    echo " 网络编号: $NETWORK_ID"
     echo "  Node ID: $NODE_ID"
     echo "  ZeroTier IP: $ZT_IP"
     echo "  物理网卡: $PHY_IFACE"
     [ -n "$LAN_SUBNETS" ] && echo "  内网网段: $LAN_SUBNETS"
     echo "  安装时间: $INSTALL_DATE"
-    
+
     echo ""
 }
 
@@ -558,38 +558,38 @@ diagnose() {
     echo ""
     echo -e "${CYAN}正在运行系统诊断...${NC}"
     echo ""
-    
+
     # 检查各个组件
     local issues=0
-    
+
     # 1. ZeroTier 服务
     if ! systemctl is-active --quiet zerotier-one; then
         log_error "ZeroTier 服务未运行"
         echo "  解决: systemctl start zerotier-one"
         ((issues++))
     fi
-    
+
     # 2. 网络接口
     if ! zerotier-cli listnetworks 2>/dev/null | grep -q "OK"; then
         log_error "未加入 ZeroTier 网络或未授权"
         echo "  解决: 访问 https://my.zerotier.com 授权设备"
         ((issues++))
     fi
-    
+
     # 3. IP 转发
     if [ "$(sysctl -n net.ipv4.ip_forward)" != "1" ]; then
         log_error "IP 转发未启用"
         echo "  解决: sysctl -w net.ipv4.ip_forward=1"
         ((issues++))
     fi
-    
+
     # 4. iptables 规则
     if ! iptables -t nat -L POSTROUTING -n | grep -q MASQUERADE; then
         log_error "NAT 规则缺失"
         echo "  解决: systemctl restart zerotier-gateway"
         ((issues++))
     fi
-    
+
     # 总结
     echo ""
     if [ "$issues" -eq 0 ]; then
@@ -597,7 +597,7 @@ diagnose() {
     else
         log_warn "诊断完成: 发现 $issues 个问题"
     fi
-    
+
     echo ""
 }
 ```
@@ -619,22 +619,22 @@ reconfigure() {
         log_error "未找到配置文件"
         exit 1
     fi
-    
+
     source /etc/zerotier-gateway.conf
-    
+
     echo ""
     echo -e "${CYAN}当前配置:${NC}"
-    echo "  Network ID: $NETWORK_ID"
+    echo " 网络编号: $NETWORK_ID"
     echo "  内网网段: ${LAN_SUBNETS:-无}"
     echo ""
-    
+
     echo "可修改的选项:"
     echo "  1. 添加/修改内网网段"
-    echo "  2. 更换 Network ID"
-    echo "  3. 修改 API Token"
+    echo "  2. 更换网络编号"
+    echo "  3. 修改接口令牌"
     echo "  4. 返回"
     echo ""
-    
+
     read -p "选择 (1-4): " choice
     case $choice in
         1)
@@ -648,8 +648,8 @@ reconfigure() {
             ;;
         2)
             echo ""
-            log_warn "更换 Network ID 需要重新加入网络"
-            read -p "输入新的 Network ID: " new_id
+            log_warn "更换网络编号需要重新加入网络"
+            read -p "输入新的网络编号: " new_id
             # 验证并应用配置
             # ...
             ;;
@@ -665,7 +665,7 @@ reconfigure() {
 
 #### 🔴 高优先级
 
-##### 4.1 API Token 安全存储
+##### 4.1接口令牌安全存储
 **问题**:
 ```bash
 # 当前：明文存储
@@ -679,10 +679,10 @@ EOF
 # 使用系统密钥环或加密存储
 save_api_token() {
     local token="$1"
-    
-    # 方案1: 不保存 API Token（推荐）
-    # API Token 只用于初始化，之后不需要
-    
+
+    # 方案1: 不保存接口令牌（推荐）
+    #接口令牌只用于初始化，之后不需要
+
     # 方案2: 加密存储
     if [ -n "$token" ]; then
         # 使用 openssl 加密
@@ -746,18 +746,18 @@ interactive_wizard() {
     echo -e "${CYAN}║${NC}          ZeroTier Gateway 交互式安装向导                      ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
-    # 步骤 1: Network ID
-    echo -e "${YELLOW}步骤 1/4: 输入 Network ID${NC}"
+
+    # 步骤 1:网络编号
+    echo -e "${YELLOW}步骤 1/4: 输入网络编号${NC}"
     echo ""
-    echo "Network ID 在哪里找？"
+    echo "网络编号在哪里找？"
     echo "  1. 访问 https://my.zerotier.com"
     echo "  2. 创建或选择一个网络"
-    echo "  3. 复制 Network ID（在网络名称下方）"
+    echo "  3. 复制网络编号（在网络名称下方）"
     echo ""
-    
+
     while true; do
-        read -p "请输入 Network ID: " network_id
+        read -p "请输入网络编号: " network_id
         if validate_network_id "$network_id"; then
             NETWORK_ID="$network_id"
             break
@@ -766,7 +766,7 @@ interactive_wizard() {
         echo -e "${RED}格式不正确，请重新输入${NC}"
         echo ""
     done
-    
+
     # 步骤 2: 使用场景
     echo ""
     echo -e "${YELLOW}步骤 2/4: 选择使用场景${NC}"
@@ -775,50 +775,50 @@ interactive_wizard() {
     echo "2. 内网穿透（访问远程内网设备）"
     echo "3. 两者都要（推荐）"
     echo ""
-    
+
     read -p "请选择 (1-3): " scenario
     case $scenario in
         2|3)
             AUTO_DETECT_LAN=true
             ;;
     esac
-    
-    # 步骤 3: API Token (可选)
+
+    # 步骤 3:接口令牌(可选)
     echo ""
-    echo -e "${YELLOW}步骤 3/4: API Token (可选)${NC}"
+    echo -e "${YELLOW}步骤 3/4:接口令牌(可选)${NC}"
     echo ""
-    echo "API Token 用于自动配置路由，可以跳过手动配置。"
+    echo "接口令牌用于自动配置路由，可以跳过手动配置。"
     echo ""
-    read -p "是否使用 API Token? (y/N): " use_token
-    
+    read -p "是否使用接口令牌? (y/N): " use_token
+
     if [[ "$use_token" =~ ^[Yy]$ ]]; then
         echo ""
-        echo "如何获取 API Token?"
+        echo "如何获取接口令牌?"
         echo "  1. 访问 https://my.zerotier.com/account"
-        echo "  2. 找到 'API Access Tokens' 部分"
-        echo "  3. 生成并复制 Token"
+        echo "  2. 找到 '接口访问令牌' 部分"
+        echo "  3. 生成并复制令牌"
         echo ""
-        read -sp "请输入 API Token: " api_token
+        read -sp "请输入接口令牌: " api_token
         echo ""
         API_TOKEN="$api_token"
     fi
-    
+
     # 步骤 4: 确认
     echo ""
     echo -e "${YELLOW}步骤 4/4: 确认配置${NC}"
     echo ""
     echo "即将使用以下配置进行安装:"
-    echo "  Network ID: $NETWORK_ID"
+    echo " 网络编号: $NETWORK_ID"
     echo "  场景: $([ $scenario -eq 1 ] && echo "仅 VPN" || [ $scenario -eq 2 ] && echo "仅内网穿透" || echo "VPN + 内网穿透")"
     echo "  自动配置: $([ -n "$API_TOKEN" ] && echo "是" || echo "否")"
     echo ""
-    
+
     read -p "开始安装? (Y/n): " confirm
     if [[ "$confirm" =~ ^[Nn]$ ]]; then
         echo "已取消"
         exit 0
     fi
-    
+
     # 开始安装
     echo ""
     echo -e "${GREEN}开始安装...${NC}"
@@ -837,7 +837,7 @@ interactive_wizard() {
 1. **安装前预检查** - 提升安全性和用户信心
 2. **智能网络环境检测** - 自动推荐最佳配置
 3. **智能冲突解决** - 自动处理常见问题
-4. **API Token 安全存储** - 修复安全漏洞
+4. **接口令牌安全存储** - 修复安全漏洞
 5. **文件权限控制** - 加固安全性
 
 **预期提升**: 用户体验 ⭐⭐⭐⭐ → ⭐⭐⭐⭐⭐ | 安全性 ⭐⭐⭐ → ⭐⭐⭐⭐⭐
@@ -886,14 +886,14 @@ interactive_wizard() {
 1. **用户体验**: 需要更多的提示、预检查和友好的错误信息
 2. **智能化**: 应该能自动检测环境并推荐最佳配置
 3. **可用性**: 需要状态查询、诊断和配置修改功能
-4. **安全性**: API Token 存储和文件权限需要加固
+4. **安全性**:接口令牌存储和文件权限需要加固
 
 **最重要的改进**（投入产出比最高）：
 1. 安装前预检查和风险提示
 2. 智能网络环境检测和配置推荐
 3. 状态查询和诊断功能
 4. 交互式向导模式
-5. API Token 安全存储
+5.接口令牌安全存储
 
 这些改进将使脚本从"能用"提升到"好用"，从"功能完整"提升到"用户友好"。
 

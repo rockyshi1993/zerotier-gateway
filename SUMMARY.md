@@ -1,16 +1,26 @@
 # ZeroTier Gateway 项目总结
 
-> 当前主线已重构为：ZeroTier 私有局域网 + 双向低延时远程 + Ubuntu 私有 HTTP/SOCKS5 代理 + 可选代理排除规则 + 可选中转。下面的旧项目分析保留为历史记录。
+> 当前发布口径（2026-06-23）：`v1.3.0` 已切换为 ZeroTier 私有局域网 + 双向低延时远程 + Ubuntu 私有 HTTP/SOCKS5 代理 + 可选代理排除规则 + 可选中转。默认配置入口为项目根目录 `.env`。
+
+## 当前测试入口
+
+```text
+tests/
+├── shell/env-parse.test.sh
+└── powershell/ProxyRules.Tests.ps1
+```
+
+下面的旧项目分析与测试总结保留为历史记录，不代表当前主线入口。
 
 # 历史分析与测试总结
 
 ## 📊 项目概况
 
-**项目名称**: ZeroTier Gateway 一键配置脚本  
-**版本**: v1.2.1  
-**类型**: Shell 脚本  
-**用途**: 通过 ZeroTier 搭建 VPN 网关，支持全局出站、内网穿透、OpenVPN 协同  
-**维护状态**: ✅ 积极维护  
+**项目名称**: ZeroTier Gateway 一键配置脚本
+**历史分析版本**: v1.2.1
+**类型**: Shell 脚本
+**用途**: 通过 ZeroTier 搭建 VPN 网关，支持全局出站、内网穿透、OpenVPN 协同
+**维护状态**: ✅ 积极维护
 
 ---
 
@@ -24,7 +34,7 @@
 - 创建了详细的问题分析报告 ([ISSUES.md](ISSUES.md))
 
 主要发现的问题：
-- 🔴 安全问题：API Token 明文存储、curl 缺少超时
+- 🔴 安全问题：接口令牌明文存储、curl 缺少超时
 - 🟡 错误处理：set -e 与 || true 混用、错误回滚不完整
 - 🟡 边界条件：未处理多 ZeroTier 接口、MTU 测试可能失败
 - 🟡 兼容性：iptables 规则保存不统一、未检测 nftables
@@ -33,7 +43,7 @@
 
 ✅ **完整的测试框架**
 
-#### 测试文件结构
+#### 旧版测试文件结构
 ```
 test/
 ├── run-tests.sh           # 测试运行主脚本
@@ -42,7 +52,7 @@ test/
 ```
 
 #### 单元测试覆盖（35 个测试用例，100% 通过）
-- ✅ Network ID 验证（4 个测试）
+- ✅ 网络编号验证（4 个测试）
 - ✅ 私有 IP 网段识别（7 个测试）
 - ✅ CIDR 格式完整验证（6 个测试）
 - ✅ 备份文件名生成（2 个测试）
@@ -100,7 +110,7 @@ examples/
 
 2. **高级安装示例**
    - 完全自动化
-   - 使用 API Token 自动配置
+   - 使用接口令牌自动配置
    - 跳过所有确认（-y 参数）
    - 适合批量部署和 CI/CD
 
@@ -150,7 +160,7 @@ examples/
 ### 短期改进（v1.2.2 - 1-2周）
 
 #### 优先级：高
-1. **API Token 安全性**
+1. **接口令牌安全性**
    ```bash
    # 修复方案
    cat > /etc/zerotier-gateway.conf << EOF
@@ -175,7 +185,7 @@ examples/
    - 完善回滚逻辑，包含 ZeroTier 网络退出
    - 恢复所有系统设置（sysctl）
 
-### 中期改进（v1.3.0 - 1-2月）
+### 中期改进（历史规划：v1.3.0 - 1-2月）
 
 #### 功能增强
 1. **多 ZeroTier 接口处理**
@@ -324,7 +334,7 @@ examples/
    ```bash
    # 单元测试
    bash test/unit-tests.sh
-   
+
    # 集成测试（需要 root）
    sudo bash test/integration-tests.sh
    ```
@@ -348,7 +358,7 @@ examples/
    - 改进错误处理
    - 预计 1-2 周
 
-2. **v1.3.0（功能版本）**
+2. **v1.3.0（历史规划中的功能版本）**
    - 添加新功能（IPv6、监控等）
    - 改进兼容性
    - 预计 1-2 月
@@ -362,12 +372,12 @@ examples/
 
 ## 📞 联系方式
 
-**项目地址**: https://github.com/rockyshi1993/zerotier-gateway  
-**问题反馈**: https://github.com/rockyshi1993/zerotier-gateway/issues  
+**项目地址**: https://github.com/rockyshi1993/zerotier-gateway
+**问题反馈**: https://github.com/rockyshi1993/zerotier-gateway/issues
 **作者**: [@rockyshi1993](https://github.com/rockyshi1993)
 
 ---
 
-**报告生成时间**: 2025-10-18  
-**分析版本**: v1.2.1  
+**报告生成时间**: 2025-10-18
+**分析版本**: v1.2.1
 **测试通过率**: 100% (35/35 单元测试)

@@ -16,19 +16,19 @@
 
 ## 1. 安全问题
 
-### 🔴 1.1 API Token 明文存储
+### 🔴 1.1接口令牌明文存储
 
 **问题描述**:
 ```bash
 # 第 856 行
 cat > /etc/zerotier-gateway.conf << EOF
 ...
-# API Token 未加密直接写入配置文件
+#接口令牌未加密直接写入配置文件
 EOF
 ```
 
 **风险**:
-- API Token 可被任何有权限读取文件的用户获取
+-接口令牌可被任何有权限读取文件的用户获取
 - 可能被用于未授权操作 ZeroTier 网络
 
 **建议修复**:
@@ -101,23 +101,23 @@ validate_cidr() {
     if ! [[ "$cidr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
         return 1
     fi
-    
+
     # 验证 IP 范围
     local ip=$(echo "$cidr" | cut -d'/' -f1)
     local mask=$(echo "$cidr" | cut -d'/' -f2)
-    
+
     IFS='.' read -ra octets <<< "$ip"
     for octet in "${octets[@]}"; do
         if [ "$octet" -gt 255 ]; then
             return 1
         fi
     done
-    
+
     # 验证掩码
     if [ "$mask" -gt 32 ]; then
         return 1
     fi
-    
+
     return 0
 }
 ```
@@ -184,29 +184,29 @@ rollback_on_error() {
 ```bash
 rollback_on_error() {
     log_error "安装失败 (第 $1 行)，正在回滚..."
-    
+
     # 1. 恢复 iptables
     local latest_backup=$(ls -t "$BACKUP_DIR"/iptables-*.rules 2>/dev/null | head -1)
     if [ -f "$latest_backup" ]; then
         iptables-restore < "$latest_backup" 2>/dev/null || true
     fi
-    
+
     # 2. 退出 ZeroTier 网络
     if [ -n "$NETWORK_ID" ]; then
         zerotier-cli leave "$NETWORK_ID" 2>/dev/null || true
     fi
-    
+
     # 3. 恢复 sysctl
     if [ -f /etc/sysctl.d/99-zerotier.conf ]; then
         rm -f /etc/sysctl.d/99-zerotier.conf
         sysctl -w net.ipv4.ip_forward=0 >/dev/null 2>&1 || true
     fi
-    
+
     # 4. 清理文件
     rm -f /usr/local/bin/zerotier-gateway-startup.sh
     rm -f /etc/systemd/system/zerotier-gateway.service
     systemctl daemon-reload 2>/dev/null || true
-    
+
     log_error "回滚完成"
 }
 ```
@@ -235,7 +235,7 @@ ZT_IFACE=$(ip addr | grep -oP 'zt\w+' | head -n 1)
 get_zt_interface() {
     local network_id="$1"
     local node_id=$(zerotier-cli info 2>/dev/null | awk '{print $3}')
-    
+
     # 遍历所有 zt 接口
     for iface in $(ip addr | grep -oP 'zt\w+'); do
         # 检查接口是否属于目标网络
@@ -244,7 +244,7 @@ get_zt_interface() {
             return 0
         fi
     done
-    
+
     return 1
 }
 
@@ -277,10 +277,10 @@ done
 optimize_mtu() {
     local zt_iface="$1"
     local best_mtu=1500
-    
+
     # 测试多个目标
     local test_targets=("8.8.8.8" "1.1.1.1" "www.google.com")
-    
+
     for mtu in 1500 1400 1280 1200; do
         local success=false
         for target in "${test_targets[@]}"; do
@@ -289,19 +289,19 @@ optimize_mtu() {
                 break
             fi
         done
-        
+
         if [ "$success" = true ]; then
             best_mtu=$mtu
             break
         fi
     done
-    
+
     # 如果所有测试失败，使用保守值
     if [ "$best_mtu" = "1500" ] && ! $success; then
         log_warn "无法测试 MTU，使用保守值 1280"
         best_mtu=1280
     fi
-    
+
     ip link set "$zt_iface" mtu "$best_mtu" 2>/dev/null || true
 }
 ```
@@ -326,19 +326,19 @@ mkdir -p "$BACKUP_DIR"
 ```bash
 backup_config() {
     step_start "备份现有配置"
-    
+
     # 检查可用空间（至少需要 10MB）
     local available=$(df "$BACKUP_DIR" 2>/dev/null | tail -1 | awk '{print $4}')
     if [ -z "$available" ]; then
         available=$(df /var 2>/dev/null | tail -1 | awk '{print $4}')
     fi
-    
+
     if [ "$available" -lt 10240 ]; then
         log_warn "磁盘空间不足，跳过备份"
         step_done "跳过备份（磁盘空间不足）"
         return
     fi
-    
+
     mkdir -p "$BACKUP_DIR"
     # ... 继续备份
 }
@@ -377,14 +377,14 @@ esac
 ```bash
 save_iptables_rules() {
     local saved=false
-    
+
     # 方法1: netfilter-persistent
     if command -v netfilter-persistent &>/dev/null; then
         if netfilter-persistent save 2>/dev/null; then
             saved=true
         fi
     fi
-    
+
     # 方法2: iptables-persistent
     if [ "$saved" = false ] && [ -d /etc/iptables ]; then
         mkdir -p /etc/iptables
@@ -392,14 +392,14 @@ save_iptables_rules() {
             saved=true
         fi
     fi
-    
+
     # 方法3: service (CentOS/RHEL)
     if [ "$saved" = false ] && command -v service &>/dev/null; then
         if service iptables save 2>/dev/null; then
             saved=true
         fi
     fi
-    
+
     if [ "$saved" = false ]; then
         log_warn "无法保存 iptables 规则，重启后可能丢失"
         log_warn "请手动运行: iptables-save > /etc/iptables/rules.v4"
@@ -495,7 +495,7 @@ check_command_success() {
     local command="$1"
     local success_msg="$2"
     local error_msg="$3"
-    
+
     if eval "$command"; then
         log_info "$success_msg"
         return 0
@@ -515,7 +515,7 @@ check_command_success() {
 ### ✅ 已添加测试
 
 1. **单元测试** (`test/unit-tests.sh`):
-   - ✅ Network ID 验证
+   - ✅网络编号验证
    - ✅ 私有 IP 检测
    - ✅ CIDR 格式验证
    - ✅ MTU 值范围验证
@@ -546,7 +546,7 @@ check_command_success() {
 ## 7. 修复优先级
 
 ### 立即修复（v1.2.2）
-1. 🔴 API Token 权限保护
+1. 🔴接口令牌权限保护
 2. 🔴 curl 超时设置
 3. 🟡 CIDR 完整验证
 4. 🟡 错误回滚增强
@@ -583,7 +583,7 @@ check_command_success() {
 - ✅ 支持多种 Linux 发行版
 
 **需要改进**:
-- ⚠️ 安全性（API Token、输入验证）
+- ⚠️ 安全性（接口令牌、输入验证）
 - ⚠️ 错误处理（回滚、超时）
 - ⚠️ 兼容性（nftables、多接口）
 
@@ -595,6 +595,6 @@ check_command_success() {
 
 ---
 
-**报告生成时间**: 2025-10-18  
-**分析版本**: v1.2.1  
+**报告生成时间**: 2025-10-18
+**分析版本**: v1.2.1
 **分析工具**: 人工代码审查 + 测试验证

@@ -1,43 +1,43 @@
-# Remote Access
+# 远程访问
 
-Use ZeroTier IPs for remote access.
+远程访问请使用 ZeroTier IP。
 
-Default IP plan:
+默认 IP 规划：
 
-| Device | ZeroTier IP |
+| 设备 | ZeroTier IP |
 |---|---|
-| Ubuntu server | `10.246.77.1` |
-| Home PC | `10.246.77.10` |
-| Work PC | `10.246.77.20` |
+| Ubuntu 节点 | `10.246.77.1` |
+| 家里电脑 | `10.246.77.10` |
+| 公司电脑 | `10.246.77.20` |
 
-## Direction
+## 访问方向
 
-Work PC to Home PC:
+公司电脑访问家里电脑：
 
 ```text
 10.246.77.10
 ```
 
-Home PC to Work PC:
+家里电脑访问公司电脑：
 
 ```text
 10.246.77.20
 ```
 
-## Firewall
+## 防火墙
 
-Only allow the peer ZeroTier IP to access remote ports.
+只允许对端 ZeroTier IP 访问远程端口。
 
-Preview:
+预览：
 
 ```powershell
 .\scripts\windows\set-firewall-rules.ps1 -Role Home
 ```
 
-Apply:
+应用：
 
 ```powershell
 .\scripts\windows\set-firewall-rules.ps1 -Role Home -Apply
 ```
 
-Do not expose remote desktop or remote control ports to the public internet.
+不要把远程桌面或远程控制端口暴露到公网。

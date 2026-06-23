@@ -1,44 +1,44 @@
-# Install Guide
+# 安装指南
 
-## Overview
+## 概览
 
-Use one ZeroTier private network for:
+本项目使用一个 ZeroTier 私有局域网完成三件事：
 
-1. Ubuntu server as the private proxy node.
-2. Home PC and Work PC as remote nodes.
-3. Optional relay only when direct connectivity is poor.
+1. Ubuntu 节点作为私有代理节点。
+2. 家里电脑和公司电脑作为互相远程的节点。
+3. 只有直连质量长期较差时，才启用中转兜底。
 
-## 1. Get The Repository
+## 1. 获取仓库
 
-Ubuntu:
+Ubuntu：
 
 ```bash
 git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd zerotier-gateway
 ```
 
-Windows PowerShell:
+Windows PowerShell：
 
 ```powershell
 git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd .\zerotier-gateway
 ```
 
-## 2. Prepare `.env`
+## 2. 准备 `.env`
 
-Copy the example config:
+复制配置样例：
 
 ```bash
 cp config/example.env .env
 ```
 
-Windows:
+Windows：
 
 ```powershell
 Copy-Item .\config\example.env .\.env
 ```
 
-Edit `.env` and fill at least:
+编辑 `.env`，至少填写：
 
 ```text
 ZEROTIER_NETWORK_ID=
@@ -46,25 +46,25 @@ PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
-Scripts read `.env` by default. Use `--env <path>` or `-Env <path>` only when the config file is not in the project root.
+脚本默认读取项目根目录下的 `.env`。只有配置文件不在项目根目录，或你要临时使用另一份配置时，才需要传 `--env <path>` 或 `-Env <path>`。
 
 ## 3. Ubuntu
 
-Preview first:
+先预览：
 
 ```bash
 sudo bash scripts/ubuntu/install.sh --dry-run
 ```
 
-Install:
+确认无误后安装：
 
 ```bash
 sudo bash scripts/ubuntu/install.sh
 ```
 
-Then authorize the Ubuntu node in ZeroTier Central and assign `10.246.77.1`.
+然后到 ZeroTier Central 授权 Ubuntu 节点，并把它的托管 IP 固定为 `10.246.77.1`。
 
-Check status:
+检查状态：
 
 ```bash
 sudo bash scripts/ubuntu/health-check.sh
@@ -72,27 +72,27 @@ sudo bash scripts/ubuntu/health-check.sh
 
 ## 4. Windows
 
-Run PowerShell as administrator.
+以管理员身份打开 PowerShell。
 
-Home PC:
+家里电脑：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Role Home
 ```
 
-Work PC:
+公司电脑：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Role Work
 ```
 
-After reviewing firewall rules, apply them explicitly:
+脚本会先打印防火墙计划。确认计划正确后，再追加 `-ApplyFirewall` 真正写入规则：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
 ```
 
-## 5. Verify
+## 5. 验证
 
 ```powershell
 .\scripts\windows\test-network.ps1

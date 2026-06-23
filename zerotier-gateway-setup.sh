@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# Deprecated: this legacy all-in-one gateway script is kept for historical
-# compatibility. The current workflow uses scripts/ubuntu, scripts/windows,
-# config, templates, and docs.
+# 已弃用：这个旧版一体化网关脚本仅保留历史兼容。
+# 当前主流程请使用 scripts/ubuntu、scripts/windows、config、templates 和 docs。
 
 ################################################################################
 # ZeroTier Linux 网关一键配置脚本 (智能增强版)
-# 版本: 1.2.4 - 修复 Ubuntu 25 兼容性问题
+# 版本: 1.3.0 - 轻量远程与私有代理主线发布，旧脚本保留历史兼容
 # 作者: rockyshi1993
 # 日期: 2025-10-18
 ################################################################################
@@ -54,7 +53,7 @@ zerotier_api_request() {
     local timeout=30
 
     if [ -z "$API_TOKEN" ]; then
-        log_error "API Token 未设置"
+        log_error "接口令牌未设置"
         return 1
     fi
 
@@ -176,13 +175,13 @@ check_root() {
 
 show_help() {
     cat << 'EOF'
-ZeroTier Gateway Setup Script v1.2.4 (修复版)
+ZeroTier Gateway 旧版一体化安装脚本 v1.3.0（历史兼容）
 
 用法: sudo bash zerotier-gateway-setup.sh [选项]
 
 选项:
-    -n <ID>     ZeroTier Network ID (16位十六进制，必填)
-    -t <TOKEN>  API Token (可选，用于自动配置路由)
+    -n <ID>     ZeroTier 网络编号（16 位十六进制，必填）
+    -t <TOKEN>  接口令牌（可选，用于自动配置路由）
     -l <NETS>   内网网段，逗号分隔 (可选，如: 192.168.1.0/24,10.0.0.0/24)
     -a          自动检测内网网段
     -y          跳过所有确认提示（快速安装）
@@ -197,17 +196,17 @@ ZeroTier Gateway Setup Script v1.2.4 (修复版)
     # 快速安装（跳过确认）
     sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -a -y
 
-    # 完全自动化（API Token + 自动检测 + 跳过确认）
+    # 完全自动化（接口令牌 + 自动检测 + 跳过确认）
     sudo bash zerotier-gateway-setup.sh -n 1234567890abcdef -t YOUR_TOKEN -a -y
 
-新功能 (v1.2.4):
+版本说明 (v1.3.0):
     ✨ 详细的实时进度显示
     ✨ 每步骤耗时统计
     ✨ 可视化进度条（50字符宽）
     ✨ 彩色输出增强可读性
     ✨ 优化确认流程
-    🐛 修复 Ubuntu 25 兼容性问题
-    🐛 移除 bc 依赖，使用纯 bash 计算
+    🐛 保留 Ubuntu 25 兼容性修复
+    🐛 保留移除 bc 依赖后的纯 bash 计算
 
 项目: https://github.com/rockyshi1993/zerotier-gateway
 EOF
@@ -573,7 +572,7 @@ if [ "$SHOW_STATUS" = true ]; then
     # 基本信息
     echo -e "${CYAN}【基本信息】${NC}"
     echo "  版本: $VERSION"
-    echo "  Network ID: $NETWORK_ID"
+    echo "  网络编号: $NETWORK_ID"
     echo "  安装日期: $INSTALL_DATE"
     echo ""
     
@@ -838,18 +837,18 @@ pre_install_check() {
 # 检查必填参数
 check_root
 if [[ ! "$NETWORK_ID" =~ ^[a-f0-9]{16}$ ]]; then
-    log_error "无效的 Network ID"
+    log_error "无效的网络编号"
     echo ""
     echo -e "${RED}错误详情:${NC}"
-    echo "  • Network ID 必须是 16 位十六进制字符"
+    echo "  • 网络编号必须是 16 位十六进制字符"
     echo "  • 有效字符: 0-9, a-f"
     echo "  • 示例: 1234567890abcdef"
     echo ""
-    echo -e "${YELLOW}如何获取 Network ID?${NC}"
+    echo -e "${YELLOW}如何获取网络编号?${NC}"
     echo "  1. 访问 https://my.zerotier.com"
     echo "  2. 登录您的账号"
     echo "  3. 在 Networks 页面找到或创建一个网络"
-    echo "  4. Network ID 显示在网络名称下方"
+    echo "  4. 网络编号显示在网络名称下方"
     echo ""
     show_help
     exit 1
@@ -860,10 +859,10 @@ clear
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.2.4${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}          ${GREEN}ZeroTier Gateway 智能安装向导 v1.3.0${NC}               ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}                                                                ${CYAN}║${NC}"
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${CYAN}║${NC}  Network ID: ${YELLOW}$NETWORK_ID${NC}                         ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  网络编号: ${YELLOW}$NETWORK_ID${NC}                         ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  总步骤: ${YELLOW}$TOTAL_STEPS${NC} 步                                             ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  预计时间: ${YELLOW}3-5${NC} 分钟                                          ${CYAN}║${NC}"
 [ "$SKIP_CONFIRM" = true ] && echo -e "${CYAN}║${NC}  模式: ${YELLOW}快速安装${NC} (跳过确认)                              ${CYAN}║${NC}"
@@ -963,7 +962,7 @@ step_done "网络加入完成"
 step_start "等待设备授权"
 
 if [ -n "$API_TOKEN" ]; then
-    echo -n "  正在使用 API Token 自动授权... "
+    echo -n "  正在使用接口令牌自动授权... "
     HOSTNAME=$(hostname | tr -d '"' | tr -d "'")
     if curl -s -X POST -H "Authorization: token $API_TOKEN" \
         -H "Content-Type: application/json" \
@@ -1187,7 +1186,7 @@ step_done "启动脚本创建完成"
 if [ -n "$API_TOKEN" ]; then
     if command -v jq &>/dev/null; then
         echo ""
-        echo -n "正在使用 API Token 自动配置路由... "
+        echo -n "正在使用接口令牌自动配置路由... "
         
         # 获取当前路由配置
         local current_routes=$(zerotier_api_request "GET" "network/$NETWORK_ID" 2>/dev/null | jq -c '.config.routes // []' 2>/dev/null)
@@ -1218,8 +1217,8 @@ if [ -n "$API_TOKEN" ]; then
             log_warn "自动路由配置失败，请手动配置"
         fi
 
-        # 安全提示：清除 API Token
-        log_info "API Token 已使用完毕，不会保存到配置文件"
+        # 安全提示：清除接口令牌
+        log_info "接口令牌已使用完毕，不会保存到配置文件"
     else
         echo ""
         log_warn "未安装 jq，无法自动配置路由"
@@ -1227,11 +1226,11 @@ if [ -n "$API_TOKEN" ]; then
     fi
 fi
 
-# 保存配置（不包含 API Token）
+# 保存配置（不包含接口令牌）
 cat > /etc/zerotier-gateway.conf << EOF
 # ZeroTier Gateway 配置文件
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
-VERSION=1.2.4
+VERSION=1.3.0
 NETWORK_ID=$NETWORK_ID
 NODE_ID=$NODE_ID
 ZT_IFACE=$ZT_IFACE
@@ -1240,7 +1239,7 @@ PHY_IFACE=$PHY_IFACE
 LAN_SUBNETS="$LAN_SUBNETS"
 INSTALL_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 BACKUP_DIR=$BACKUP_DIR
-# 注意: API Token 不会保存在此文件中（安全考虑）
+# 注意: 接口令牌不会保存在此文件中（安全考虑）
 EOF
 
 # 设置配置文件权限（安全加固）
@@ -1284,7 +1283,7 @@ echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║${NC}                      ${YELLOW}配置摘要${NC}                                ${CYAN}║${NC}"
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${CYAN}║${NC}  Network ID:    ${YELLOW}$NETWORK_ID${NC}                  ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  网络编号:      ${YELLOW}$NETWORK_ID${NC}                  ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  Node ID:       ${YELLOW}$NODE_ID${NC}                     ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  ZeroTier IP:   ${YELLOW}$ZT_IP${NC}                                  ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  物理网卡:      ${YELLOW}$PHY_IFACE${NC}                                    ${CYAN}║${NC}"

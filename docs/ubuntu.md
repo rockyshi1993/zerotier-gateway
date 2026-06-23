@@ -1,12 +1,12 @@
-# Ubuntu Server
+# Ubuntu 节点
 
-The Ubuntu server provides:
+Ubuntu 节点负责提供：
 
-- ZeroTier membership.
-- Private HTTP/SOCKS5 proxy through sing-box.
-- Optional relay fallback.
+- 加入 ZeroTier 私有网络。
+- 通过 sing-box 提供私有 HTTP/SOCKS5 代理。
+- 在直连质量较差时提供可选中转兜底。
 
-## Commands
+## 常用命令
 
 ```bash
 sudo bash scripts/ubuntu/install.sh --dry-run
@@ -14,26 +14,26 @@ sudo bash scripts/ubuntu/install.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
-## Proxy Binding
+## 代理监听
 
-The proxy must bind to the Ubuntu ZeroTier IP:
+代理必须监听 Ubuntu 的 ZeroTier IP：
 
 ```text
 PROXY_BIND_IP=10.246.77.1
 PROXY_PORT=10808
 ```
 
-Do not bind the proxy to `0.0.0.0`.
+不要把代理监听地址改成 `0.0.0.0`。
 
-## Systemd
+## 系统服务
 
-The proxy service is rendered from:
+代理服务文件由以下模板生成：
 
 ```text
 templates/systemd/sing-box-zt-proxy.service.tmpl
 ```
 
-The generated runtime config is intended for:
+生成后的运行配置默认写入：
 
 ```text
 /etc/zerotier-gateway/sing-box-server.json

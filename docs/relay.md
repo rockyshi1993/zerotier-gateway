@@ -1,29 +1,29 @@
-# Relay Fallback
+# 中转兜底
 
-Relay is optional.
+中转是可选能力，不是默认主路径。
 
-Use it only when:
+只有满足下面情况时才考虑启用：
 
-1. Home PC and Work PC are not DIRECT for a long time.
-2. Remote access is clearly poor.
-3. UDP/NAT conditions cannot be improved.
+1. 家里电脑和公司电脑长期无法建立直连。
+2. 远程访问体验明显较差。
+3. UDP 或 NAT 条件无法继续优化。
 
-Preview:
+先预览：
 
 ```bash
 sudo bash scripts/ubuntu/install-relay.sh --dry-run
 ```
 
-Install or wire your relay service:
+安装或接入中转服务：
 
 ```bash
 sudo bash scripts/ubuntu/install-relay.sh
 ```
 
-Disable:
+停用：
 
 ```bash
 sudo bash scripts/ubuntu/disable-relay.sh
 ```
 
-Relay should never replace normal DIRECT connectivity when DIRECT works well.
+直连工作良好时，不要用中转替代正常直连。

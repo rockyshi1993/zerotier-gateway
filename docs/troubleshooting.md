@@ -1,58 +1,58 @@
-# Troubleshooting
+# 故障排查
 
-## Config Not Found
+## 找不到配置文件
 
-Scripts default to `.env` in the project root.
+脚本默认读取项目根目录下的 `.env`。
 
-Fix:
+修复方式：
 
 ```bash
 cp config/example.env .env
 ```
 
-Windows:
+Windows：
 
 ```powershell
 Copy-Item .\config\example.env .\.env
 ```
 
-## ZeroTier Not Reachable
+## ZeroTier 无法连通
 
-Check:
+检查：
 
-1. Devices are authorized in ZeroTier Central.
-2. IP addresses are fixed as expected.
-3. Windows firewall allows the peer ZeroTier IP.
-4. Route for `10.246.77.0/24` uses ZeroTier.
+1. 设备已经在 ZeroTier Central 授权。
+2. 三台机器的 ZeroTier IP 已按预期固定。
+3. Windows 防火墙允许对端 ZeroTier IP 访问远程端口。
+4. `10.246.77.0/24` 的路由走 ZeroTier。
 
-Run:
+运行：
 
 ```powershell
 .\scripts\windows\test-network.ps1
 ```
 
-## Proxy Not Reachable
+## 代理无法连通
 
-Check:
+检查：
 
-1. Ubuntu has `10.246.77.1`.
-2. sing-box service is running.
-3. Proxy listens on `10.246.77.1:10808`.
-4. Username and password are correct.
+1. Ubuntu 节点已经拿到 `10.246.77.1`。
+2. sing-box 服务正在运行。
+3. 代理监听在 `10.246.77.1:10808`。
+4. 代理用户名和密码正确。
 
-Run:
+运行：
 
 ```powershell
 .\scripts\windows\test-proxy.ps1
 ```
 
-## Process Bypass Misses Traffic
+## 进程排除没有命中
 
-Multi-process software may use services, helper processes, or updater processes.
+多进程软件可能会启动服务进程、辅助进程或更新进程。
 
-Find candidates:
+查找候选进程：
 
 ```powershell
-.\scripts\windows\show-diagnostics.ps1 -FindProcess "remote"
-.\scripts\windows\show-diagnostics.ps1 -FindProcessPath "C:\Program Files\RemoteTool"
+.\scripts\windows\show-diagnostics.ps1 -FindProcess "远程"
+.\scripts\windows\show-diagnostics.ps1 -FindProcessPath "C:\Program Files\远程工具"
 ```

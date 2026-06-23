@@ -1,36 +1,36 @@
-# Windows Client
+# Windows 客户端
 
-Run scripts from an administrator PowerShell when changing firewall rules.
+涉及防火墙规则写入时，请以管理员身份运行 PowerShell。
 
-## Setup
+## 初始化
 
-Home PC:
+家里电脑：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Role Home
 ```
 
-Work PC:
+公司电脑：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Role Work
 ```
 
-The script prints a firewall plan first. Add `-ApplyFirewall` only after checking the plan.
+脚本会先打印防火墙计划。确认计划正确后，再追加 `-ApplyFirewall` 真正写入规则。
 
-## Diagnostics
+## 诊断
 
 ```powershell
 .\scripts\windows\test-network.ps1
 .\scripts\windows\test-proxy.ps1
-.\scripts\windows\show-diagnostics.ps1 -FindProcess "remote"
+.\scripts\windows\show-diagnostics.ps1 -FindProcess "远程"
 ```
 
-## Config Path
+## 配置路径
 
-The default config path is `.env` in the project root.
+默认配置路径是项目根目录下的 `.env`。
 
-Use this only for non-default config locations:
+只有配置文件不在默认位置时，才需要显式指定路径：
 
 ```powershell
 .\scripts\windows\test-network.ps1 -Env .\profiles\office.env
