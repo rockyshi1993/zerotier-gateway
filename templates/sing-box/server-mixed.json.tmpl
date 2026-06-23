@@ -8,13 +8,7 @@
       "type": "mixed",
       "tag": "zt-private-proxy",
       "listen": "${PROXY_BIND_IP}",
-      "listen_port": ${PROXY_PORT},
-      "users": [
-        {
-          "username": "${PROXY_USERNAME}",
-          "password": "${PROXY_PASSWORD}"
-        }
-      ]
+      "listen_port": ${PROXY_PORT}${SERVER_AUTH_JSON}
     }
   ],
   "outbounds": [

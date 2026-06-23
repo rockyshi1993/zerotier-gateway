@@ -5,7 +5,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bash "$ROOT/scripts/ubuntu/install.sh" --env "$ROOT/tests/fixtures/example.env" --dry-run
 
 tmp_env="$(mktemp)"
-trap 'rm -f "$tmp_env" "$ROOT/artifacts/sing-box-server.json"' EXIT
+tmp_no_auth_env="$(mktemp)"
+tmp_half_auth_env="$(mktemp)"
+trap 'rm -f "$tmp_env" "$tmp_no_auth_env" "$tmp_half_auth_env" "$ROOT/artifacts/sing-box-server.json"' EXIT
 cat > "$tmp_env" <<'ENV'
 ZEROTIER_NETWORK_ID=0123456789abcdef
 PROXY_USERNAME=test-user
@@ -15,5 +17,29 @@ ENV
 bash "$ROOT/scripts/ubuntu/install-proxy.sh" --env "$tmp_env" --dry-run
 if grep -q '\${PROXY_PORT}' "$ROOT/artifacts/sing-box-server.json"; then
   echo "template default placeholder was not rendered" >&2
+  exit 1
+fi
+if ! grep -q '"users"' "$ROOT/artifacts/sing-box-server.json"; then
+  echo "proxy auth users were not rendered when credentials are set" >&2
+  exit 1
+fi
+
+cat > "$tmp_no_auth_env" <<'ENV'
+ZEROTIER_NETWORK_ID=0123456789abcdef
+ENV
+
+bash "$ROOT/scripts/ubuntu/install-proxy.sh" --env "$tmp_no_auth_env" --dry-run
+if grep -q '"users"' "$ROOT/artifacts/sing-box-server.json"; then
+  echo "proxy auth users should not be rendered by default" >&2
+  exit 1
+fi
+
+cat > "$tmp_half_auth_env" <<'ENV'
+ZEROTIER_NETWORK_ID=0123456789abcdef
+PROXY_USERNAME=test-user
+ENV
+
+if bash "$ROOT/scripts/ubuntu/install-proxy.sh" --env "$tmp_half_auth_env" --dry-run; then
+  echo "half proxy credentials should fail validation" >&2
   exit 1
 fi

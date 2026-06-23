@@ -16,11 +16,42 @@ $client = New-ZtgClientRulesContent -Config $config
 if ($client -notmatch 'ubuntu-proxy') {
   throw 'Client rules do not include ubuntu-proxy outbound.'
 }
+if ($client -notmatch '"username":\s*"test-user"' -or $client -notmatch '"password":\s*"test-pass"') {
+  throw 'Client proxy auth was not rendered when credentials are set.'
+}
 if ($client -notmatch '"action":"route"') {
   throw 'Client route rules do not include explicit route action.'
 }
 if ($client -notmatch '"process_name":\["steam\.exe","mstsc\.exe","msrdc\.exe"\]') {
   throw 'Client process rules were not merged as an array.'
+}
+$client | ConvertFrom-Json | Out-Null
+
+$noAuthConfig = [ordered]@{}
+foreach ($key in $config.Keys) {
+  $noAuthConfig[$key] = $config[$key]
+}
+$noAuthConfig['PROXY_USERNAME'] = ''
+$noAuthConfig['PROXY_PASSWORD'] = ''
+$noAuthClient = New-ZtgClientRulesContent -Config $noAuthConfig
+if ($noAuthClient -match '"username"' -or $noAuthClient -match '"password"') {
+  throw 'Client proxy auth should not be rendered by default.'
+}
+$noAuthClient | ConvertFrom-Json | Out-Null
+
+$halfAuthConfig = [ordered]@{}
+foreach ($key in $config.Keys) {
+  $halfAuthConfig[$key] = $config[$key]
+}
+$halfAuthConfig['PROXY_USERNAME'] = 'test-user'
+$halfAuthConfig['PROXY_PASSWORD'] = ''
+try {
+  New-ZtgClientRulesContent -Config $halfAuthConfig | Out-Null
+  throw 'Half proxy credentials should fail validation.'
+} catch {
+  if ($_.Exception.Message -notmatch 'must be set together') {
+    throw
+  }
 }
 
 Write-Host 'ProxyRules.Tests.ps1 passed'

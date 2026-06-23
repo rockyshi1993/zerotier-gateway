@@ -59,8 +59,13 @@ function Assert-ZtgEnv {
   if ($Config['PROXY_BIND_IP'] -eq '0.0.0.0') {
     throw 'PROXY_BIND_IP must not be 0.0.0.0. Use the Ubuntu ZeroTier IP.'
   }
-  if ($RequireProxyCredentials -and ([string]::IsNullOrWhiteSpace($Config['PROXY_USERNAME']) -or [string]::IsNullOrWhiteSpace($Config['PROXY_PASSWORD']))) {
-    throw 'PROXY_USERNAME and PROXY_PASSWORD are required.'
+  $hasProxyUsername = $Config.Contains('PROXY_USERNAME') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_USERNAME'])
+  $hasProxyPassword = $Config.Contains('PROXY_PASSWORD') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_PASSWORD'])
+  if ($hasProxyUsername -xor $hasProxyPassword) {
+    throw 'PROXY_USERNAME and PROXY_PASSWORD must be set together, or both left empty to disable proxy authentication.'
+  }
+  if ($RequireProxyCredentials -and -not ($hasProxyUsername -and $hasProxyPassword)) {
+    throw 'PROXY_USERNAME and PROXY_PASSWORD are required when proxy authentication is enabled.'
   }
 }
 

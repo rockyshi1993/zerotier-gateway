@@ -123,12 +123,24 @@ function New-ZtgClientRulesContent {
   $rulesJson = ConvertTo-Json -InputObject @($rules) -Depth 8 -Compress
   if (-not $rulesJson) { $rulesJson = '[]' }
 
+  $hasProxyUsername = $Config.Contains('PROXY_USERNAME') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_USERNAME'])
+  $hasProxyPassword = $Config.Contains('PROXY_PASSWORD') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_PASSWORD'])
+  if ($hasProxyUsername -xor $hasProxyPassword) {
+    throw 'PROXY_USERNAME and PROXY_PASSWORD must be set together, or both left empty to disable proxy authentication.'
+  }
+
+  $authJson = ''
+  if ($hasProxyUsername -and $hasProxyPassword) {
+    $usernameJson = ConvertTo-Json -InputObject ([string]$Config['PROXY_USERNAME']) -Compress
+    $passwordJson = ConvertTo-Json -InputObject ([string]$Config['PROXY_PASSWORD']) -Compress
+    $authJson = ",`n      `"username`": $usernameJson,`n      `"password`": $passwordJson"
+  }
+
   $template = Get-Content -Raw -LiteralPath (Join-Path (Get-ZtgProjectRoot) 'templates/sing-box/windows-local-client.json.tmpl')
   $template = $template.Replace('${LOCAL_PROXY_PORT}', [string]$Config['LOCAL_PROXY_PORT'])
   $template = $template.Replace('${UBUNTU_ZT_IP}', [string]$Config['UBUNTU_ZT_IP'])
   $template = $template.Replace('${PROXY_PORT}', [string]$Config['PROXY_PORT'])
-  $template = $template.Replace('${PROXY_USERNAME}', [string]$Config['PROXY_USERNAME'])
-  $template = $template.Replace('${PROXY_PASSWORD}', [string]$Config['PROXY_PASSWORD'])
+  $template = $template.Replace('${CLIENT_PROXY_AUTH_JSON}', $authJson)
   $template = $template.Replace('${ROUTE_RULES_JSON}', $rulesJson)
   return $template
 }

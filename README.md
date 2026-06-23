@@ -39,7 +39,7 @@
 3. 一台 Ubuntu 机器，能使用 `sudo`。
 4. 家里和公司两台 Windows 电脑，能用管理员身份打开 PowerShell。
 5. 两台 Windows 上已经安装好你平时使用的远程工具，远程地址改填对方的 ZeroTier IP。
-6. 一个代理用户名和密码，后面填到 `.env` 的 `PROXY_USERNAME` 和 `PROXY_PASSWORD`。
+6. 如果你想给代理加认证，再准备一个代理用户名和密码；默认可以不填。
 
 ## 完整流程
 
@@ -80,9 +80,11 @@ ZEROTIER_NETWORK_ID=你的 ZeroTier 网络编号
 UBUNTU_ZT_IP=10.246.77.1
 HOME_PC_ZT_IP=10.246.77.10
 WORK_PC_ZT_IP=10.246.77.20
-PROXY_USERNAME=自己设置一个代理用户名
-PROXY_PASSWORD=自己设置一个代理密码
+PROXY_USERNAME=
+PROXY_PASSWORD=
 ```
+
+`PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
 
 默认配置行为：
 
@@ -163,11 +165,11 @@ sudo bash scripts/ubuntu/health-check.sh
 地址：10.246.77.1
 端口：10808
 协议：HTTP 或 SOCKS5
-用户名：PROXY_USERNAME
-密码：PROXY_PASSWORD
+用户名：默认不填；启用认证时填 PROXY_USERNAME
+密码：默认不填；启用认证时填 PROXY_PASSWORD
 ```
 
-只在需要代理上网的软件里填这个代理。没有配置代理的软件继续走本机原网络。
+如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。只在需要代理上网的软件里填这个代理；没有配置代理的软件继续走本机原网络。
 
 测试代理：
 

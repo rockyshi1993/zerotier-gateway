@@ -20,9 +20,7 @@
       "type": "socks",
       "tag": "ubuntu-proxy",
       "server": "${UBUNTU_ZT_IP}",
-      "server_port": ${PROXY_PORT},
-      "username": "${PROXY_USERNAME}",
-      "password": "${PROXY_PASSWORD}"
+      "server_port": ${PROXY_PORT}${CLIENT_PROXY_AUTH_JSON}
     }
   ],
   "route": {

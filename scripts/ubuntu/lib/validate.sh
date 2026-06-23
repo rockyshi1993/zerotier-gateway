@@ -12,8 +12,9 @@ ztg_validate_proxy_config() {
     ztg_log_error "PROXY_BIND_IP must not be 0.0.0.0. Use the Ubuntu ZeroTier IP."
     exit 1
   fi
-  if [ -z "${PROXY_USERNAME:-}" ] || [ -z "${PROXY_PASSWORD:-}" ]; then
-    ztg_log_error "PROXY_USERNAME and PROXY_PASSWORD are required."
+  if { [ -n "${PROXY_USERNAME:-}" ] && [ -z "${PROXY_PASSWORD:-}" ]; } || \
+     { [ -z "${PROXY_USERNAME:-}" ] && [ -n "${PROXY_PASSWORD:-}" ]; }; then
+    ztg_log_error "PROXY_USERNAME and PROXY_PASSWORD must be set together, or both left empty to disable proxy authentication."
     exit 1
   fi
 }

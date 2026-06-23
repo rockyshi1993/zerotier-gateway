@@ -93,9 +93,11 @@ WORK_PC_ZT_IP=10.246.77.20
 
 PROXY_BIND_IP=10.246.77.1
 PROXY_PORT=10808
-PROXY_USERNAME=自己设置一个用户名
-PROXY_PASSWORD=自己设置一个密码
+PROXY_USERNAME=
+PROXY_PASSWORD=
 ```
+
+默认不需要代理用户名和密码。只有你想限制谁能使用这个代理时，才同时填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`。
 
 字段含义：
 
@@ -107,8 +109,8 @@ PROXY_PASSWORD=自己设置一个密码
 | `WORK_PC_ZT_IP` | 公司电脑固定 IP，推荐 `10.246.77.20` |
 | `PROXY_BIND_IP` | 代理监听地址，通常和 Ubuntu 节点 IP 一样 |
 | `PROXY_PORT` | 代理端口，默认 `10808` |
-| `PROXY_USERNAME` | 代理用户名 |
-| `PROXY_PASSWORD` | 代理密码 |
+| `PROXY_USERNAME` | 可选代理用户名；留空表示不启用认证 |
+| `PROXY_PASSWORD` | 可选代理密码；留空表示不启用认证 |
 
 默认情况下，Ubuntu 和 Windows 脚本都会读取项目根目录的 `.env`。只有你把配置文件放到别的位置，才需要传 `--env <path>` 或 `-Env <path>`。
 
@@ -207,8 +209,8 @@ sudo bash scripts/ubuntu/health-check.sh
 地址：10.246.77.1
 端口：10808
 协议：HTTP 或 SOCKS5
-用户名：.env 里的 PROXY_USERNAME
-密码：.env 里的 PROXY_PASSWORD
+用户名：默认不填；启用认证时填 .env 里的 PROXY_USERNAME
+密码：默认不填；启用认证时填 .env 里的 PROXY_PASSWORD
 ```
 
 只在需要代理的软件里填这个代理。没有配置代理的软件继续走原网络。
@@ -335,7 +337,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 | 三台机器互相 ping 不通 | ZeroTier 是否授权、IP 是否固定、是否在同一网络 |
 | 远程工具连不上 | 是否填了对方 ZeroTier IP；Windows 防火墙是否允许远程端口 |
 | 代理连不上 | Ubuntu 是否在线；`health-check.sh` 是否看到 `10.246.77.1:10808` |
-| 代理认证失败 | `.env` 里的用户名密码是否和软件里填写一致 |
+| 代理认证失败 | 如果启用了认证，检查 `.env` 里的用户名密码是否和软件里填写一致；如果没启用认证，软件里不要填用户名密码 |
 | 排除规则不生效 | 是否重新生成 PAC 或本地客户端规则；多进程软件是否只填了主进程 |
 | 直连延迟高 | 先排查授权、防火墙和网络质量，再考虑中转 |
 
