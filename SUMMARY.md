@@ -7,6 +7,10 @@
 ```text
 tests/
 ├── shell/env-parse.test.sh
+├── shell/init-config.test.sh
+├── shell/sing-box-install.test.sh
+├── powershell/Firewall.Tests.ps1
+├── powershell/InitConfig.Tests.ps1
 └── powershell/ProxyRules.Tests.ps1
 ```
 

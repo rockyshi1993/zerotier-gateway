@@ -121,6 +121,10 @@ sudo bash scripts/ubuntu/health-check.sh
 
 ### 4. 配置两台 Windows
 
+两台 Windows 都已经加入同一个 ZeroTier 网络后，还需要分别在本机执行一次 Windows 脚本。脚本会读取 `.env`，告诉你这台电脑应该放行哪一个对端 ZeroTier IP。
+
+只加入 ZeroTier 网络、并且不需要被远程访问的电脑，可以不执行 `setup.ps1`；需要被另一台电脑远程访问，或需要本项目帮你检查网络和生成代理规则的 Windows，建议执行。
+
 家里电脑用管理员 PowerShell：
 
 ```powershell
@@ -152,11 +156,34 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
+`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。家里电脑的规则会放行公司电脑的 ZeroTier IP，公司电脑的规则会放行家里电脑的 ZeroTier IP。
+
+如果写入防火墙时看到红色报错：
+
+```text
+New-NetFirewallRule : 拒绝访问。
+Windows System Error 5
+```
+
+说明当前 PowerShell 没有足够权限，或系统策略拒绝写入防火墙。先关闭当前窗口，右键 PowerShell 选择“以管理员身份运行”，进入项目目录后重新执行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+公司电脑把最后一行改成：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
 成功标准：
 
 - 家里电脑能 `ping 10.246.77.20`。
 - 公司电脑能 `ping 10.246.77.10`。
 - `test-network.ps1` 没有关键失败项。
+- 执行 `-ApplyFirewall` 时没有红色报错，并看到 `Firewall rules applied.`。
 
 ### 5. 远程访问
 

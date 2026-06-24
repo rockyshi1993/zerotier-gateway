@@ -31,17 +31,31 @@ function New-ZtgFirewallPlan {
   }
 }
 
+function Test-ZtgWindowsAdministrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+  return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Assert-ZtgFirewallAdministrator {
+  if (-not (Test-ZtgWindowsAdministrator)) {
+    throw 'Firewall changes require an elevated PowerShell. Right-click PowerShell, choose Run as administrator, run Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass, then retry the command.'
+  }
+}
+
 function Apply-ZtgFirewallPlan {
   param([Parameter(Mandatory)]$Plan)
 
+  Assert-ZtgFirewallAdministrator
   foreach ($rule in $Plan) {
-    Get-NetFirewallRule -DisplayName $rule.DisplayName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-    New-NetFirewallRule -DisplayName $rule.DisplayName -Direction Inbound -Protocol $rule.Protocol -LocalPort $rule.LocalPort -RemoteAddress $rule.RemoteAddress -Action Allow | Out-Null
+    Get-NetFirewallRule -DisplayName $rule.DisplayName -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
+    New-NetFirewallRule -DisplayName $rule.DisplayName -Direction Inbound -Protocol $rule.Protocol -LocalPort $rule.LocalPort -RemoteAddress $rule.RemoteAddress -Action Allow -ErrorAction Stop | Out-Null
   }
 }
 
 function Remove-ZtgFirewallRules {
-  Get-NetFirewallRule -DisplayName 'ZT Gateway Remote Inbound *' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+  Assert-ZtgFirewallAdministrator
+  Get-NetFirewallRule -DisplayName 'ZT Gateway Remote Inbound *' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
 }
 
-Export-ModuleMember -Function Get-ZtgRemotePeerIp,New-ZtgFirewallPlan,Apply-ZtgFirewallPlan,Remove-ZtgFirewallRules
+Export-ModuleMember -Function Get-ZtgRemotePeerIp,New-ZtgFirewallPlan,Test-ZtgWindowsAdministrator,Assert-ZtgFirewallAdministrator,Apply-ZtgFirewallPlan,Remove-ZtgFirewallRules

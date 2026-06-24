@@ -34,6 +34,38 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 然后重新运行刚才的脚本。`-Scope Process` 只影响当前窗口，关掉窗口后会恢复。
 
+## Windows 防火墙规则写入失败
+
+如果执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+或：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
+看到类似报错：
+
+```text
+New-NetFirewallRule : 拒绝访问。
+Windows System Error 5
+```
+
+通常是当前 PowerShell 不是管理员权限，或系统策略拒绝写入防火墙。处理方式：
+
+1. 关闭当前 PowerShell。
+2. 右键 PowerShell，选择“以管理员身份运行”。
+3. 进入项目目录。
+4. 先执行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`。
+5. 家里电脑重新执行 `.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall`。
+6. 公司电脑重新执行 `.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall`。
+
+如果公司电脑或安全软件禁止修改防火墙，请在系统防火墙里手动允许对端 ZeroTier IP 访问远程端口。默认示例里，家里电脑放行 `10.246.77.20`，公司电脑放行 `10.246.77.10`。
+
 ## ZeroTier 无法连通
 
 检查：

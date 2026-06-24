@@ -2,6 +2,12 @@
 
 所有显著变更将记录在此文件，遵循变更日志规范与语义化版本。
 
+## [未发布]
+
+### 修复
+- Windows 防火墙规则写入现在会先检查管理员 PowerShell，`New-NetFirewallRule` 或 `Remove-NetFirewallRule` 失败时会立即停止，不再误报已应用。
+- README、安装指南和故障排查补充 `拒绝访问` / `Windows System Error 5` 的处理步骤，并说明哪些 Windows 电脑需要执行脚本。
+
 ## [1.3.0] - 2026-06-23
 
 ### 新增

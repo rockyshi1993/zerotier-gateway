@@ -16,9 +16,10 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 ## Windows
 
-移除本项目创建的 Windows 防火墙规则：
+用管理员 PowerShell 移除本项目创建的 Windows 防火墙规则：
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\setup.ps1 -Rollback
 ```
 

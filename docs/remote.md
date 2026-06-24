@@ -28,16 +28,21 @@
 
 只允许对端 ZeroTier IP 访问远程端口。
 
-预览：
+家里电脑预览：
 
 ```powershell
 .\scripts\windows\set-firewall-rules.ps1 -Role Home
 ```
 
-应用：
+家里电脑应用：
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\set-firewall-rules.ps1 -Role Home -Apply
 ```
+
+公司电脑把 `Home` 改成 `Work`。
+
+写入防火墙规则必须使用管理员 PowerShell。如果看到 `New-NetFirewallRule : 拒绝访问。` 或 `Windows System Error 5`，请右键 PowerShell 选择“以管理员身份运行”，进入项目目录后重新执行。
 
 不要把远程桌面或远程控制端口暴露到公网。

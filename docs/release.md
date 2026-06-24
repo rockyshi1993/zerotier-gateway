@@ -29,6 +29,10 @@ bash -n scripts/ubuntu/lib/*.sh
 
 ```bash
 bash tests/shell/env-parse.test.sh
+bash tests/shell/init-config.test.sh
+bash tests/shell/sing-box-install.test.sh
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/Firewall.Tests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/InitConfig.Tests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/ProxyRules.Tests.ps1
 ```
 
