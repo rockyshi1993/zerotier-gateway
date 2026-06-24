@@ -17,7 +17,7 @@
 | 家庭宽带没有公网 IPv4 | [常见问题](#常见问题) |
 | 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
 | 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
-| 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转) |
+| 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转)、[验证中转是否成功](#验证中转是否成功) |
 | 检查是否配置成功 | [9. 最终验收](#9-最终验收) |
 | 查看常见问题、常见选择和更多文档 | [常见问题](#常见问题)、[常见选择](#常见选择)、[文档入口](#文档入口) |
 
@@ -432,7 +432,93 @@ sudo bash scripts/ubuntu/install-relay.sh --dry-run
 sudo bash scripts/ubuntu/install-relay.sh
 ```
 
-安装后，远程工具里不再填对方 Windows 的 ZeroTier IP，而是按上表填写 Ubuntu 的中转地址。直连恢复稳定后，建议切回对方 Windows 的 ZeroTier IP。
+看到下面这类输出，只代表中转 socket 已经安装并启用，还需要继续按下一节验证链路：
+
+```text
+created symlink ...
+[INFO] Relay sockets installed.
+```
+
+#### 验证中转是否成功
+
+先在 Ubuntu 上确认两个中转入口已经监听：
+
+```bash
+systemctl is-active zerotier-gateway-relay-home-3389.socket
+systemctl is-active zerotier-gateway-relay-work-3389.socket
+ss -lntp | grep -E '10.246.77.1:(443|444)'
+```
+
+成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。如果没有监听，先确认 Ubuntu 的 ZeroTier IP 是 `10.246.77.1`：
+
+```bash
+zerotier-cli listnetworks
+```
+
+再从两台 Windows 测 Ubuntu 中转端口：
+
+公司电脑测“公司访问家里”的入口：
+
+```powershell
+Test-NetConnection 10.246.77.1 -Port 443
+```
+
+家里电脑测“家里访问公司”的入口：
+
+```powershell
+Test-NetConnection 10.246.77.1 -Port 444
+```
+
+成功时应看到：
+
+```text
+TcpTestSucceeded : True
+```
+
+如果这里是 `False`，说明 Windows 到 Ubuntu 中转入口不通。先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+
+```bash
+sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
+sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
+sudo ufw status
+```
+
+再确认 Ubuntu 能访问两台 Windows 的远程端口：
+
+```bash
+nc -vz 10.246.77.10 3389
+nc -vz 10.246.77.20 3389
+```
+
+如果提示没有 `nc`，先安装：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y netcat-openbsd
+```
+
+`nc` 成功时应看到 `succeeded`。如果 Ubuntu 访问某台 Windows 的 `3389` 失败，去对应 Windows 上重新写入防火墙规则：
+
+家里电脑：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+公司电脑：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
+全部验证通过后，远程工具里不再填对方 Windows 的 ZeroTier IP，而是按下面填写 Ubuntu 的中转地址：
+
+| 远程方向 | 远程工具里填写 |
+|---|---|
+| 公司访问家里 | `10.246.77.1:443` |
+| 家里访问公司 | `10.246.77.1:444` |
+
+直连恢复稳定后，建议切回对方 Windows 的 ZeroTier IP。
 
 停用中转：
 

@@ -32,9 +32,51 @@ sudo bash scripts/ubuntu/install-relay.sh
 安装后检查：
 
 ```bash
+systemctl is-active zerotier-gateway-relay-home-3389.socket
+systemctl is-active zerotier-gateway-relay-work-3389.socket
 systemctl status zerotier-gateway-relay-home-3389.socket
 systemctl status zerotier-gateway-relay-work-3389.socket
-ss -lntp | grep -E ':443|:444'
+ss -lntp | grep -E '10.246.77.1:(443|444)'
+```
+
+成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。
+
+从两台 Windows 测中转入口：
+
+```powershell
+# 公司电脑：访问家里电脑的中转入口
+Test-NetConnection 10.246.77.1 -Port 443
+
+# 家里电脑：访问公司电脑的中转入口
+Test-NetConnection 10.246.77.1 -Port 444
+```
+
+成功时应看到：
+
+```text
+TcpTestSucceeded : True
+```
+
+再从 Ubuntu 测目标 Windows 远程端口：
+
+```bash
+nc -vz 10.246.77.10 3389
+nc -vz 10.246.77.20 3389
+```
+
+如果没有 `nc`：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y netcat-openbsd
+```
+
+如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+
+```bash
+sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
+sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
+sudo ufw status
 ```
 
 停用：

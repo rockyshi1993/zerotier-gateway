@@ -489,7 +489,51 @@ sudo bash scripts/ubuntu/install-relay.sh --dry-run
 sudo bash scripts/ubuntu/install-relay.sh
 ```
 
-安装后，把远程工具里的地址临时改成上表的 Ubuntu 中转地址。直连恢复稳定后，再切回对方 Windows 的 ZeroTier IP。
+安装后先验证 Ubuntu 是否已经监听中转端口：
+
+```bash
+systemctl is-active zerotier-gateway-relay-home-3389.socket
+systemctl is-active zerotier-gateway-relay-work-3389.socket
+ss -lntp | grep -E '10.246.77.1:(443|444)'
+```
+
+成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。
+
+再从 Windows 测 Ubuntu 中转入口：
+
+```powershell
+# 公司电脑测公司访问家里的入口
+Test-NetConnection 10.246.77.1 -Port 443
+
+# 家里电脑测家里访问公司的入口
+Test-NetConnection 10.246.77.1 -Port 444
+```
+
+成功时应看到 `TcpTestSucceeded : True`。
+
+如果 Windows 到 Ubuntu 端口不通，先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+
+```bash
+sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
+sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
+sudo ufw status
+```
+
+再从 Ubuntu 测目标 Windows 远程端口：
+
+```bash
+nc -vz 10.246.77.10 3389
+nc -vz 10.246.77.20 3389
+```
+
+如果没有 `nc`，先执行：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y netcat-openbsd
+```
+
+安装和验证都通过后，把远程工具里的地址临时改成上表的 Ubuntu 中转地址。直连恢复稳定后，再切回对方 Windows 的 ZeroTier IP。
 
 停用：
 
