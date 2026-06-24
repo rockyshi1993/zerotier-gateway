@@ -27,11 +27,11 @@ grep -q '^PROXY_PORT=18080$' "$tmp_env"
 grep -q '^PROXY_USERNAME=proxy-user$' "$tmp_env"
 grep -q '^PROXY_PASSWORD=proxy-pass$' "$tmp_env"
 
-printf 'fedcba9876543210\n10.99.0.0/24\n10.99.0.1\n10.99.0.10\n10.99.0.20\n18080\ny\n0.0.0.0\n203.0.113.10\n198.51.100.23/32\nn\n' | bash "$ROOT/scripts/ubuntu/init-config.sh" --env "$tmp_env" >/dev/null
+printf 'fedcba9876543210\n10.99.0.0/24\n10.99.0.1\n10.99.0.10\n10.99.0.20\n18080\ny\n203.0.113.10\n\nn\n' | bash "$ROOT/scripts/ubuntu/init-config.sh" --env "$tmp_env" >/dev/null
 
 grep -q '^PROXY_PUBLIC_ACCESS=true$' "$tmp_env"
 grep -q '^PROXY_BIND_IP=0.0.0.0$' "$tmp_env"
 grep -q '^PROXY_CONNECT_HOST=203.0.113.10$' "$tmp_env"
-grep -q '^PROXY_ALLOWED_CLIENT_CIDRS=198.51.100.23/32$' "$tmp_env"
+grep -q '^PROXY_ALLOWED_CLIENT_CIDRS=$' "$tmp_env"
 
 echo "init-config.test.sh passed"

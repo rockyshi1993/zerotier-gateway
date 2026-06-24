@@ -153,8 +153,8 @@ zerotier-cli peers
 2. sing-box 服务正在运行。
 3. 默认私有入口时，代理监听在 `10.246.77.1:10808`。
 4. 如果启用了公网入口，`PROXY_PUBLIC_ACCESS=true`，并且 `PROXY_CONNECT_HOST` 是 Ubuntu 服务器公网 IP。
-5. 如果启用了公网入口，云防火墙和 Ubuntu 防火墙允许你的来源公网 IP 访问 `10808/tcp`。
-6. 如果启用了公网入口，`PROXY_ALLOWED_CLIENT_CIDRS` 已填写公司或家里的公网 IP/CIDR；没有白名单时脚本不会添加宽泛公网放行规则。
+5. 如果启用了公网入口，云防火墙和 Ubuntu 防火墙允许客户端访问 `10808/tcp`。
+6. 如果启用了公网入口，`PROXY_ALLOWED_CLIENT_CIDRS` 可以留空；留空表示允许全部来源访问代理端口。填写后只允许指定来源。
 7. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
 8. 如果刚修改过代理账号密码、代理入口或白名单，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件、PAC 或本地规则也已经同步。
 
@@ -200,7 +200,7 @@ sudo bash scripts/ubuntu/install.sh
 PROXY_PUBLIC_ACCESS=true
 PROXY_BIND_IP=0.0.0.0
 PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 ```
 
 然后在 Ubuntu 上执行：

@@ -38,11 +38,11 @@ PROXY_PORT=10808
 PROXY_BIND_IP=0.0.0.0
 PROXY_PUBLIC_ACCESS=true
 PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_PORT=10808
 ```
 
-开启公网入口后，客户端代理入口改为 `PROXY_CONNECT_HOST:10808`。账号密码仍然可选，但必须用云防火墙或 Ubuntu 防火墙限制来源 IP，不要把 `10808` 对全网开放。
+开启公网入口后，客户端代理入口改为 `PROXY_CONNECT_HOST:10808`。账号密码仍然可选，`PROXY_ALLOWED_CLIENT_CIDRS` 也可留空；留空表示全部来源可访问 `10808`。长期使用建议填写来源 IP 白名单或启用代理账号密码。
 
 ## 系统服务
 

@@ -22,7 +22,7 @@ Ubuntu 节点通过 sing-box 提供私有 HTTP/SOCKS5 混合代理。
 PROXY_BIND_IP=0.0.0.0
 PROXY_PUBLIC_ACCESS=true
 PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_PORT=10808
 ```
 
@@ -30,11 +30,11 @@ PROXY_PORT=10808
 
 | 字段 | 含义 |
 |---|---|
-| `PROXY_BIND_IP` | Ubuntu 上代理监听在哪个地址；私有入口填 `10.246.77.1`，公网入口可填 `0.0.0.0` |
-| `PROXY_CONNECT_HOST` | Windows 和软件实际连接哪个地址；私有入口填 `10.246.77.1`，公网入口填服务器公网 IP |
-| `PROXY_ALLOWED_CLIENT_CIDRS` | 允许访问公网代理入口的来源公网 IP/CIDR |
+| `PROXY_BIND_IP` | Ubuntu 上代理监听在哪个地址；私有入口填 `10.246.77.1`，公网入口由初始化脚本自动设为 `0.0.0.0` |
+| `PROXY_CONNECT_HOST` | Windows 和软件实际连接哪个地址；私有入口填 `10.246.77.1`，公网入口优先自动识别服务器公网 IP |
+| `PROXY_ALLOWED_CLIENT_CIDRS` | 允许访问公网代理入口的来源公网 IP/CIDR；留空表示全部来源 |
 
-账号密码仍然可选：`PROXY_USERNAME` 和 `PROXY_PASSWORD` 都留空就不启用认证；两项都填写才启用认证。公网入口不开启认证也能运行，但必须用云防火墙或 Ubuntu 防火墙限制来源 IP，不要对全网开放 `10808`。
+账号密码仍然可选：`PROXY_USERNAME` 和 `PROXY_PASSWORD` 都留空就不启用认证；两项都填写才启用认证。`PROXY_ALLOWED_CLIENT_CIDRS` 留空时会允许全部来源访问公网代理端口，适合临时测试；长期使用建议填写来源 IP 白名单，或至少启用代理账号密码。
 
 让公网入口生效：
 
@@ -57,7 +57,7 @@ Windows 侧测试：
 
 1. `PROXY_CONNECT_HOST` 是服务器公网 IP，不是 `10.246.77.1`。
 2. 云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
-3. Ubuntu `ufw` 已放行 `PROXY_ALLOWED_CLIENT_CIDRS`。
+3. `PROXY_ALLOWED_CLIENT_CIDRS` 留空时，Ubuntu `ufw` 会放行全部来源；填写后只放行指定来源。
 4. 如果启用了账号密码，客户端填写的用户名和密码与 Ubuntu `.env` 一致。
 
 ## 后续启用或修改账号密码

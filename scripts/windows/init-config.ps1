@@ -145,16 +145,19 @@ $proxyAllowedClientCidrs = ''
 if (Read-YesNo -Label 'Enable public proxy entry for better speed' -Default $publicDefault) {
   $publicBindDefault = Get-ConfigValue -Map $current -Key 'PROXY_BIND_IP' -Default '0.0.0.0'
   $publicConnectDefault = Get-ConfigValue -Map $current -Key 'PROXY_CONNECT_HOST' -Default ''
-  if (-not $publicDefault) {
+  if (-not $publicDefault -or [string]::IsNullOrWhiteSpace($publicBindDefault) -or $publicBindDefault -eq $ubuntuIp) {
     $publicBindDefault = '0.0.0.0'
+  }
+  if (-not $publicDefault -or $publicConnectDefault -eq $ubuntuIp) {
     $publicConnectDefault = ''
   }
   $proxyPublicAccess = 'true'
-  $proxyBindIp = Read-ConfigValue -Label 'Proxy listen address, usually 0.0.0.0 or the server public interface IP' -Default $publicBindDefault -Required
-  $proxyConnectHost = Read-ConfigValue -Label 'Client proxy host, use the server public IP for public entry' -Default $publicConnectDefault -Required
-  $proxyAllowedClientCidrs = Read-ConfigValue -Label 'Allowed public client IP/CIDR list, comma separated, can be empty for now' -Default (Get-ConfigValue -Map $current -Key 'PROXY_ALLOWED_CLIENT_CIDRS' -Default '')
+  $proxyBindIp = $publicBindDefault
+  Write-ZtgInfo "Proxy listen address is set automatically: $proxyBindIp"
+  $proxyConnectHost = Read-ConfigValue -Label 'Client proxy host, press Enter to keep current value; enter server public IP if empty' -Default $publicConnectDefault -Required
+  $proxyAllowedClientCidrs = Read-ConfigValue -Label 'Allowed public client IP/CIDR list, blank means all sources' -Default (Get-ConfigValue -Map $current -Key 'PROXY_ALLOWED_CLIENT_CIDRS' -Default '')
   if ([string]::IsNullOrWhiteSpace($proxyAllowedClientCidrs)) {
-    Write-ZtgWarn 'No public client whitelist was entered. The Ubuntu script will not add a broad public allow rule.'
+    Write-ZtgWarn 'No public client whitelist was entered. Blank means all sources can reach the public proxy port.'
   }
 }
 

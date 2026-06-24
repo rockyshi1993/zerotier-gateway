@@ -61,7 +61,11 @@ ZEROTIER_NETWORK_ID=0123456789abcdef
 PROXY_BIND_IP=0.0.0.0
 PROXY_PUBLIC_ACCESS=true
 PROXY_CONNECT_HOST=203.0.113.10
-PROXY_ALLOWED_CLIENT_CIDRS=198.51.100.23/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 ENV
 
-bash "$ROOT/scripts/ubuntu/install-proxy.sh" --env "$tmp_public_env" --dry-run
+public_output="$(bash "$ROOT/scripts/ubuntu/install-proxy.sh" --env "$tmp_public_env" --dry-run 2>&1)"
+if ! grep -q 'allow all source IPs' <<< "$public_output"; then
+  echo "empty public client CIDR list should be reported as all-source access" >&2
+  exit 1
+fi

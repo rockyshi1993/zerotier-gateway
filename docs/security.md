@@ -28,12 +28,13 @@
 PROXY_PUBLIC_ACCESS=true
 PROXY_BIND_IP=0.0.0.0
 PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 ```
 
-安全要求：
+建议：
 
-- `PROXY_ALLOWED_CLIENT_CIDRS` 至少填写公司、家里当前公网 IP 的 `/32`。
-- 云厂商防火墙也要限制来源 IP，不要只依赖应用层配置。
-- 代理账号密码仍然是可选项；如果来源 IP 不固定，建议同时填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`。
+- `PROXY_ALLOWED_CLIENT_CIDRS` 可以留空；留空表示全部来源都能访问公网代理端口。
+- 长期使用时，建议填写公司、家里当前公网 IP 的 `/32`。
+- 云厂商防火墙也可以限制来源 IP，不要只依赖应用层配置。
+- 代理账号密码仍然是可选项；如果来源 IP 不固定，或白名单留空，建议同时填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`。
 - 不要把远程控制端口暴露到公网；公网入口只用于代理上网。

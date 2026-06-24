@@ -149,6 +149,45 @@ prompt_yes_no() {
   done
 }
 
+ipv4_is_public() {
+  local ip="$1"
+  local a b c d
+  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS='.' read -r a b c d <<< "$ip"
+  for part in "$a" "$b" "$c" "$d"; do
+    [[ "$part" =~ ^[0-9]+$ ]] || return 1
+    [ "$part" -ge 0 ] && [ "$part" -le 255 ] || return 1
+  done
+  [ "$a" -eq 10 ] && return 1
+  [ "$a" -eq 127 ] && return 1
+  [ "$a" -eq 169 ] && [ "$b" -eq 254 ] && return 1
+  [ "$a" -eq 172 ] && [ "$b" -ge 16 ] && [ "$b" -le 31 ] && return 1
+  [ "$a" -eq 192 ] && [ "$b" -eq 168 ] && return 1
+  [ "$a" -eq 100 ] && [ "$b" -ge 64 ] && [ "$b" -le 127 ] && return 1
+  [ "$a" -ge 224 ] && return 1
+  return 0
+}
+
+detect_public_ipv4() {
+  local candidate=""
+  if command -v ip >/dev/null 2>&1; then
+    candidate="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' || true)"
+    if ipv4_is_public "$candidate"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  fi
+  if command -v hostname >/dev/null 2>&1; then
+    for candidate in $(hostname -I 2>/dev/null || true); do
+      if ipv4_is_public "$candidate"; then
+        printf '%s' "$candidate"
+        return 0
+      fi
+    done
+  fi
+  return 1
+}
+
 load_current_env
 
 if [ -f "$ENV_FILE" ]; then
@@ -176,16 +215,25 @@ proxy_allowed_client_cidrs=""
 if prompt_yes_no "是否启用代理公网入口提速" "$public_default"; then
   public_bind_default="$(current_or_default PROXY_BIND_IP "0.0.0.0")"
   public_connect_default="$(current_or_default PROXY_CONNECT_HOST "")"
-  if [ "$public_default" != "true" ]; then
+  if [ "$public_default" != "true" ] || [ -z "$public_bind_default" ] || [ "$public_bind_default" = "$ubuntu_ip" ]; then
     public_bind_default="0.0.0.0"
+  fi
+  if [ "$public_default" != "true" ] || [ -z "$public_connect_default" ] || [ "$public_connect_default" = "$ubuntu_ip" ]; then
     public_connect_default=""
+    public_connect_default="$(detect_public_ipv4 || true)"
   fi
   proxy_public_access="true"
-  proxy_bind_ip="$(prompt_value "代理监听地址，公网入口通常填 0.0.0.0 或服务器公网网卡 IP" "$public_bind_default" true)"
-  proxy_connect_host="$(prompt_value "客户端连接代理地址，公网入口必须填服务器公网 IP" "$public_connect_default" true)"
-  proxy_allowed_client_cidrs="$(prompt_value "允许访问公网代理的公网 IP/CIDR，多个用英文逗号分隔，可先留空" "$(current_or_default PROXY_ALLOWED_CLIENT_CIDRS "")" false)"
+  proxy_bind_ip="$public_bind_default"
+  echo "[INFO] 代理监听地址自动设置为：$proxy_bind_ip"
+  if [ -n "$public_connect_default" ]; then
+    echo "[INFO] 已自动识别客户端连接代理地址：$public_connect_default"
+    proxy_connect_host="$(prompt_value "客户端连接代理地址，直接回车使用自动识别值" "$public_connect_default" false)"
+  else
+    proxy_connect_host="$(prompt_value "客户端连接代理地址，未能自动识别时填服务器公网 IP" "" true)"
+  fi
+  proxy_allowed_client_cidrs="$(prompt_value "允许访问公网代理的公网 IP/CIDR，留空表示全部来源" "$(current_or_default PROXY_ALLOWED_CLIENT_CIDRS "")" false)"
   if [ -z "$proxy_allowed_client_cidrs" ]; then
-    echo "[WARN] 未填写公网访问白名单。脚本不会添加公网放行规则，请先在云防火墙或系统防火墙限制来源 IP。"
+    echo "[WARN] 未填写公网访问白名单，表示允许全部来源访问代理端口。"
   fi
 else
   proxy_bind_ip="$ubuntu_ip"

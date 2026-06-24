@@ -79,10 +79,10 @@ function Assert-ZtgEnv {
       Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST is not a server public IP. Clients may still use the slower ZeroTier entry.'
     }
     if ([string]::IsNullOrWhiteSpace([string]$Config['PROXY_ALLOWED_CLIENT_CIDRS'])) {
-      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_ALLOWED_CLIENT_CIDRS is empty. Configure cloud/system firewall whitelist before exposing the proxy port.'
+      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true and PROXY_ALLOWED_CLIENT_CIDRS is empty. Public proxy access will allow all source IPs unless another firewall restricts it.'
     }
     if (-not ($hasProxyUsername -and $hasProxyPassword)) {
-      Write-ZtgWarn 'Proxy authentication is disabled. This is allowed, but public access should be protected by a strict firewall whitelist.'
+      Write-ZtgWarn 'Proxy authentication is disabled. This is allowed, but all-source public access can be abused if exposed to the Internet.'
     }
   }
 }

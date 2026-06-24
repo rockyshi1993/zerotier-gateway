@@ -102,7 +102,7 @@ PROXY_PASSWORD=
 
 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
 
-`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。后续如果想优化代理测速，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，但公网入口必须认真配置来源 IP 白名单。
+`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。后续如果想优化代理测速，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，来源 IP 白名单也可选。白名单留空表示允许全部来源访问公网代理端口。
 
 如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
 
@@ -352,12 +352,12 @@ cd ~/zerotier-gateway
 bash scripts/ubuntu/init-config.sh
 ```
 
-走到“是否启用代理公网入口提速”时选择启用，按下面填写：
+走到“是否启用代理公网入口提速”时选择启用。脚本会自动把代理监听地址设为 `0.0.0.0`，并尝试识别 Ubuntu 服务器公网 IP：
 
 ```text
-代理监听地址：0.0.0.0
-客户端连接代理地址：你的 Ubuntu 服务器公网 IP
-允许访问公网代理的公网 IP/CIDR：公司公网IP/32,家里公网IP/32
+代理监听地址：脚本自动设置为 0.0.0.0
+客户端连接代理地址：能自动识别时直接回车；识别失败时填 Ubuntu 服务器公网 IP
+允许访问公网代理的公网 IP/CIDR：可留空；留空表示全部来源
 ```
 
 生成后的 `.env` 会类似这样：
@@ -366,13 +366,13 @@ bash scripts/ubuntu/init-config.sh
 PROXY_BIND_IP=0.0.0.0
 PROXY_PUBLIC_ACCESS=true
 PROXY_CONNECT_HOST=服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_PORT=10808
 PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
-账号密码仍然可以不填；两项都留空时不启用认证。如果公网入口没有配置账号密码，至少要保证云防火墙或系统防火墙只允许你的公司、家里公网 IP 访问 `10808`，不要把代理端口对全网开放。
+账号密码仍然可以不填；两项都留空时不启用认证。`PROXY_ALLOWED_CLIENT_CIDRS` 留空时，脚本会把 `10808` 按“全部来源”放行。这样最省事，但公网代理端口会直接暴露到互联网；长期使用时建议填写公司、家里公网 IP，或至少启用代理账号密码。
 
 让配置生效：
 
@@ -415,7 +415,7 @@ PROXY_PASSWORD
 
 1. `PROXY_CONNECT_HOST` 是服务器公网 IP，不是 `10.246.77.1`。
 2. DigitalOcean 或其他云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
-3. Ubuntu 的 `ufw` 已允许 `PROXY_ALLOWED_CLIENT_CIDRS` 访问 `10808/tcp`。
+3. 如果 `PROXY_ALLOWED_CLIENT_CIDRS` 留空，Ubuntu 的 `ufw` 会允许全部来源访问 `10808/tcp`；如果填写了白名单，只会放行白名单里的来源。
 
 #### 后续启用或修改代理账号密码
 

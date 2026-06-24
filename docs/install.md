@@ -115,10 +115,10 @@ PROXY_PASSWORD=
 | `UBUNTU_ZT_IP` | Ubuntu 节点固定 IP，推荐 `10.246.77.1` |
 | `HOME_PC_ZT_IP` | 家里电脑固定 IP，推荐 `10.246.77.10` |
 | `WORK_PC_ZT_IP` | 公司电脑固定 IP，推荐 `10.246.77.20` |
-| `PROXY_BIND_IP` | 代理监听地址；默认填 Ubuntu ZeroTier IP，开启公网入口时可填 `0.0.0.0` |
+| `PROXY_BIND_IP` | 代理监听地址；默认填 Ubuntu ZeroTier IP，开启公网入口时脚本自动设为 `0.0.0.0` |
 | `PROXY_PUBLIC_ACCESS` | 是否启用代理公网入口；默认 `false` |
-| `PROXY_CONNECT_HOST` | 客户端连接代理时使用的地址；默认 `10.246.77.1`，公网入口填服务器公网 IP |
-| `PROXY_ALLOWED_CLIENT_CIDRS` | 允许访问公网代理的来源公网 IP/CIDR，多个用英文逗号分隔 |
+| `PROXY_CONNECT_HOST` | 客户端连接代理时使用的地址；默认 `10.246.77.1`，公网入口优先自动识别服务器公网 IP |
+| `PROXY_ALLOWED_CLIENT_CIDRS` | 允许访问公网代理的来源公网 IP/CIDR，多个用英文逗号分隔；留空表示全部来源 |
 | `PROXY_PORT` | 代理端口，默认 `10808` |
 | `PROXY_USERNAME` | 可选代理用户名；留空表示不启用认证 |
 | `PROXY_PASSWORD` | 可选代理密码；留空表示不启用认证 |
@@ -195,7 +195,7 @@ sudo bash scripts/ubuntu/health-check.sh
 - Ubuntu 节点在 ZeroTier Central 显示在线。
 - Ubuntu 节点 IP 是 `10.246.77.1`。
 - 默认代理监听在 `10.246.77.1:10808`。
-- 如果启用了代理公网入口，代理可以监听 `0.0.0.0:10808`，但云防火墙或系统防火墙必须限制来源 IP。
+- 如果启用了代理公网入口，代理会监听 `0.0.0.0:10808`；来源白名单留空时表示全部来源都能访问。
 
 如果 `health-check.sh` 提示 `sing-box-zt-proxy.service could not be found`，说明代理服务没有装上，先重新执行：
 
@@ -375,12 +375,12 @@ cd ~/zerotier-gateway
 bash scripts/ubuntu/init-config.sh
 ```
 
-走到“是否启用代理公网入口提速”时选择启用，推荐填写：
+走到“是否启用代理公网入口提速”时选择启用。脚本会自动把代理监听地址设为 `0.0.0.0`，并尝试识别 Ubuntu 服务器公网 IP：
 
 ```text
-代理监听地址：0.0.0.0
-客户端连接代理地址：Ubuntu 服务器公网 IP
-允许访问公网代理的公网 IP/CIDR：公司公网IP/32,家里公网IP/32
+代理监听地址：脚本自动设置为 0.0.0.0
+客户端连接代理地址：能自动识别时直接回车；识别失败时填 Ubuntu 服务器公网 IP
+允许访问公网代理的公网 IP/CIDR：可留空；留空表示全部来源
 ```
 
 生成后的关键配置：
@@ -389,11 +389,11 @@ bash scripts/ubuntu/init-config.sh
 PROXY_BIND_IP=0.0.0.0
 PROXY_PUBLIC_ACCESS=true
 PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_PORT=10808
 ```
 
-代理账号密码仍然是可选项。不开启账号密码也可以，但公网入口必须用云防火墙或系统防火墙限制来源 IP；不要把 `10808` 对全网开放。
+代理账号密码仍然是可选项。不开启账号密码也可以，来源 IP 白名单也可以留空；但白名单留空时公网入口会允许全部来源访问 `10808`，长期使用建议填写公司、家里公网 IP，或至少启用代理账号密码。
 
 让 Ubuntu 代理重新生效：
 
