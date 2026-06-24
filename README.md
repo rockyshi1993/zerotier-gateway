@@ -125,23 +125,46 @@ sudo bash scripts/ubuntu/health-check.sh
 
 只加入 ZeroTier 网络、并且不需要被远程访问的电脑，可以不执行 `setup.ps1`；需要被另一台电脑远程访问，或需要本项目帮你检查网络和生成代理规则的 Windows，建议执行。
 
-家里电脑用管理员 PowerShell：
+先在 Windows 上打开管理员 PowerShell：
+
+1. 关闭普通 PowerShell 窗口。
+2. 开始菜单搜索 `PowerShell` 或 `Windows Terminal`。
+3. 右键选择“以管理员身份运行”。
+4. 进入项目目录；下面以 `E:\Worker\zerotier-gateway` 为例，如果你的仓库在别的位置，把路径换成自己的仓库目录。
+
+确认当前窗口是不是管理员：
+
+```powershell
+([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+```
+
+返回 `True` 才能写入防火墙规则；如果返回 `False`，先关闭窗口，重新用“以管理员身份运行”打开。
+
+再临时允许当前窗口运行本仓库脚本：
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+这条命令只解决“脚本被 Windows 阻止运行”的问题，不会提升管理员权限。关掉当前 PowerShell 窗口后会恢复。
+
+家里电脑执行：
+
+```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Home
 .\scripts\windows\test-network.ps1
 ```
 
-公司电脑用管理员 PowerShell：
+公司电脑执行：
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work
 .\scripts\windows\test-network.ps1
 ```
 
-`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` 只对当前 PowerShell 窗口生效，关掉窗口后会恢复，用来避免 Windows 阻止本次 `.ps1` 脚本运行。
+不要在同一台电脑上把 `-Role Home` 和 `-Role Work` 都执行一遍。`Role` 表示“当前这台电脑是谁”，不是你要连接的目标。
 
 然后到 ZeroTier Central：
 
@@ -151,8 +174,17 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 如果要让脚本写入 Windows 防火墙规则，分别在对应电脑上执行：
 
+家里电脑：
+
 ```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+公司电脑：
+
+```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
@@ -165,7 +197,14 @@ New-NetFirewallRule : 拒绝访问。
 Windows System Error 5
 ```
 
-说明当前 PowerShell 没有足够权限，或系统策略拒绝写入防火墙。先关闭当前窗口，右键 PowerShell 选择“以管理员身份运行”，进入项目目录后重新执行：
+说明当前 PowerShell 没有管理员权限，或系统策略拒绝写入防火墙。先关闭当前窗口，重新用“以管理员身份运行”打开 PowerShell，进入项目目录后确认管理员状态：
+
+```powershell
+cd E:\Worker\zerotier-gateway
+([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+```
+
+返回 `True` 后再执行：
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass

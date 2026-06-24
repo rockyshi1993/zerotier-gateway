@@ -163,7 +163,20 @@ sudo bash scripts/ubuntu/install.sh
 
 ## 第 4 步：配置两台 Windows
 
-以管理员身份打开 PowerShell。
+先在 Windows 上打开管理员 PowerShell：
+
+1. 关闭普通 PowerShell 窗口。
+2. 开始菜单搜索 `PowerShell` 或 `Windows Terminal`。
+3. 右键选择“以管理员身份运行”。
+4. 进入项目目录；下面以 `E:\Worker\zerotier-gateway` 为例，如果你的仓库在别的位置，把路径换成自己的仓库目录。
+
+确认当前窗口是不是管理员：
+
+```powershell
+([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+```
+
+返回 `True` 才能写入防火墙规则；如果返回 `False`，先关闭窗口，重新用“以管理员身份运行”打开。
 
 先临时允许当前窗口运行本仓库脚本：
 
@@ -171,7 +184,7 @@ sudo bash scripts/ubuntu/install.sh
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-这条命令只影响当前 PowerShell 窗口，关掉窗口后会恢复。
+这条命令只解决“脚本被 Windows 阻止运行”的问题，不会提升管理员权限。关掉当前 PowerShell 窗口后会恢复。
 
 两台 Windows 都已经加入同一个 ZeroTier 网络后，还需要分别在本机执行一次 Windows 脚本。脚本会读取 `.env`，告诉你这台电脑应该放行哪一个对端 ZeroTier IP。
 
@@ -180,14 +193,20 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 家里电脑：
 
 ```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Home
+.\scripts\windows\test-network.ps1
 ```
 
 公司电脑：
 
 ```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work
+.\scripts\windows\test-network.ps1
 ```
+
+不要在同一台电脑上把 `-Role Home` 和 `-Role Work` 都执行一遍。`Role` 表示“当前这台电脑是谁”，不是你要连接的目标。
 
 到 ZeroTier Central：
 
@@ -195,16 +214,19 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 2. 家里电脑固定为 `10.246.77.10`。
 3. 公司电脑固定为 `10.246.77.20`。
 
-先测试网络：
-
-```powershell
-.\scripts\windows\test-network.ps1
-```
-
 如果需要让脚本写入 Windows 防火墙规则，分别在对应电脑上执行：
 
+家里电脑：
+
 ```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+公司电脑：
+
+```powershell
+cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
@@ -217,7 +239,14 @@ New-NetFirewallRule : 拒绝访问。
 Windows System Error 5
 ```
 
-先确认 PowerShell 是“以管理员身份运行”。如果不是，关闭窗口，右键 PowerShell 选择“以管理员身份运行”，进入项目目录后重新执行：
+先确认 PowerShell 是“以管理员身份运行”。如果不是，关闭窗口，右键 PowerShell 选择“以管理员身份运行”，进入项目目录后确认管理员状态：
+
+```powershell
+cd E:\Worker\zerotier-gateway
+([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+```
+
+返回 `True` 后再执行：
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass

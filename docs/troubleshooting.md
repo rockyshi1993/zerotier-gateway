@@ -60,9 +60,16 @@ Windows System Error 5
 1. 关闭当前 PowerShell。
 2. 右键 PowerShell，选择“以管理员身份运行”。
 3. 进入项目目录。
-4. 先执行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`。
-5. 家里电脑重新执行 `.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall`。
-6. 公司电脑重新执行 `.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall`。
+4. 确认管理员状态返回 `True`：
+
+```powershell
+cd E:\Worker\zerotier-gateway
+([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+```
+
+5. 先执行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`。这条命令只放行当前窗口运行脚本，不会提升管理员权限。
+6. 家里电脑重新执行 `.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall`。
+7. 公司电脑重新执行 `.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall`。
 
 如果公司电脑或安全软件禁止修改防火墙，请在系统防火墙里手动允许对端 ZeroTier IP 访问远程端口。默认示例里，家里电脑放行 `10.246.77.20`，公司电脑放行 `10.246.77.10`。
 
