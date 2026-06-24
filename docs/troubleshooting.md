@@ -81,12 +81,69 @@ cd E:\Worker\zerotier-gateway
 2. 三台机器的 ZeroTier IP 已按预期固定。
 3. Windows 防火墙允许对端 ZeroTier IP 访问远程端口。
 4. `10.246.77.0/24` 的路由走 ZeroTier。
+5. ZeroTier Central 里没有残留 `172.27.x.x` 地址池或成员 IP。
 
 运行：
 
 ```powershell
 .\scripts\windows\test-network.ps1
 ```
+
+## ZeroTier Central 网段或地址池配置不干净
+
+到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持：
+
+| 位置 | 应该保留 |
+|---|---|
+| `Managed Routes` | `10.246.77.0/24 (LAN)` |
+| `IPv4 Auto-Assign` | 可以关闭自动分配，改为手动固定 IP |
+| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
+
+不要把 `10.246.77.0/24` 填到 `Via`。如果还有 `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池、成员机器上的 `172.27.x.x`，或误填的 `192.168.x.x` 地址池，建议删掉。
+
+三台机器只保留：
+
+| 设备 | Managed IP |
+|---|---|
+| Ubuntu 节点 | `10.246.77.1` |
+| 家里 Windows 电脑 | `10.246.77.10` |
+| 公司 Windows 电脑 | `10.246.77.20` |
+
+调整后，在 Windows 上执行：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli listnetworks
+```
+
+`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
+
+## 开启 TUN 或全局代理后远程不通
+
+如果开启 TUN、全局代理、加速器或其他接管系统流量的软件后远程不通，先让 ZeroTier 网段直连：
+
+```text
+10.246.77.0/24
+```
+
+如果代理工具支持按进程直连，把 ZeroTier 进程也加入直连。可用下面命令查看实际进程名和路径：
+
+```powershell
+Get-Process | Where-Object { $_.ProcessName -like "*ZeroTier*" } | Select-Object ProcessName,Path
+```
+
+远程工具本身也建议走直连；如果代理工具支持按进程规则，把远程工具的主进程、服务进程和辅助进程一起加入直连。
+
+改完后，两台 Windows 都执行：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli peers
+```
+
+公司访问家里时测 `ping -n 20 10.246.77.10`；家里访问公司时测 `ping -n 20 10.246.77.20`。
+
+如果 `peers` 里对方节点的 `path` 仍然显示为代理出口 IP，说明 ZeroTier 进程还在被 TUN 接管，需要继续检查代理工具的直连规则。
 
 ## 代理无法连通
 

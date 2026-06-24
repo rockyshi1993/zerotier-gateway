@@ -118,6 +118,41 @@ PROXY_PASSWORD=
 
 默认情况下，Ubuntu 和 Windows 脚本都会读取项目根目录的 `.env`。只有你把配置文件放到别的位置，才需要传 `--env <path>` 或 `-Env <path>`。
 
+### ZeroTier Central 网段和地址池检查
+
+到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持下面这种简单配置：
+
+| 位置 | 应该保留 |
+|---|---|
+| `Managed Routes` | `10.246.77.0/24 (LAN)` |
+| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给三台机器手动固定 IP |
+| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
+
+不要把 `10.246.77.0/24` 填到 `Add Routes` 下面的 `Via` 里。`Via` 是“让某个节点转发某个网段”时才用；本项目默认只需要 `10.246.77.0/24 (LAN)`。
+
+如果页面里还有下面这些内容，建议删掉：
+
+- `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池。
+- 成员机器上的 `172.27.x.x` Managed IP。
+- 误填到地址池里的 `192.168.x.x`。
+
+三台机器最终只需要这些 ZeroTier IP：
+
+| 设备 | Managed IP |
+|---|---|
+| Ubuntu 节点 | `10.246.77.1` |
+| 家里 Windows 电脑 | `10.246.77.10` |
+| 公司 Windows 电脑 | `10.246.77.20` |
+
+调整后，在家里和公司两台 Windows 上重启 ZeroTier 并检查：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli listnetworks
+```
+
+`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
+
 ## 第 3 步：安装 Ubuntu 节点
 
 先预览，不改系统：
@@ -279,6 +314,35 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 如果远程工具本身有多个进程，排除代理时不要只排除一个主程序。应按安装目录、路径正则或完整进程名清单一起处理。
 
+### TUN 或全局代理开启后远程不通
+
+如果家里或公司电脑开启了 TUN、全局代理、加速器或其他接管系统流量的软件，远程可能变慢，甚至直接连不上。处理原则是：代理可以开，但 ZeroTier 网段和 ZeroTier 进程必须直连。
+
+在代理工具的直连或绕过规则里加入：
+
+```text
+10.246.77.0/24
+```
+
+如果代理工具支持按进程直连，把 ZeroTier 进程也加入直连。可用下面命令查看实际进程名和路径：
+
+```powershell
+Get-Process | Where-Object { $_.ProcessName -like "*ZeroTier*" } | Select-Object ProcessName,Path
+```
+
+远程工具本身也建议走直连；如果代理工具支持按进程规则，把远程工具的主进程、服务进程和辅助进程一起加入直连。
+
+改完后，两台 Windows 都执行：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli peers
+```
+
+公司访问家里时测 `ping -n 20 10.246.77.10`；家里访问公司时测 `ping -n 20 10.246.77.20`。
+
+如果 `peers` 里对方节点的 `path` 仍然显示为代理出口 IP，说明 ZeroTier 进程还在被 TUN 接管，需要继续检查代理工具的直连规则。
+
 ## 第 6 步：代理上网
 
 代理入口：
@@ -434,6 +498,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 | Ubuntu IP | `10.246.77.1` |
 | 家里电脑 IP | `10.246.77.10` |
 | 公司电脑 IP | `10.246.77.20` |
+| ZeroTier 地址 | `zerotier-cli listnetworks` 里没有残留 `172.27.x.x` |
 | 远程访问 | 两台 Windows 能用对方 ZeroTier IP 远程 |
 | 代理入口 | `10.246.77.1:10808` 可用 |
 | 代理范围 | 只有配置了代理的软件走 Ubuntu |
@@ -449,6 +514,6 @@ sudo bash scripts/ubuntu/disable-relay.sh
 | 代理连不上 | Ubuntu 是否在线；`health-check.sh` 是否看到 `10.246.77.1:10808` |
 | 代理认证失败 | 如果启用了认证，检查 `.env` 里的用户名密码是否和软件里填写一致；如果没启用认证，软件里不要填用户名密码 |
 | 排除规则不生效 | 是否重新生成 PAC 或本地客户端规则；多进程软件是否只填了主进程 |
-| 直连延迟高 | 先排查授权、防火墙和网络质量，再考虑中转 |
+| 直连延迟高 | 先检查 ZeroTier Central 是否只保留 `10.246.77.0/24`，TUN 或全局代理是否让 `10.246.77.0/24` 和 ZeroTier 进程直连，再考虑中转 |
 
 更多排查命令见 [故障排查](troubleshooting.md)。

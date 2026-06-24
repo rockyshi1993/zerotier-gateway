@@ -9,9 +9,11 @@
 | 先确认这个项目是不是适合你 | [适合什么场景](#适合什么场景)、[最终会得到什么](#最终会得到什么) |
 | 第一次安装前准备 | [开始前准备](#开始前准备)、[1. 获取项目](#1-获取项目)、[2. 生成配置](#2-生成配置) |
 | 配置 Ubuntu 代理节点 | [3. 配置 Ubuntu 节点](#3-配置-ubuntu-节点) |
+| 检查 ZeroTier Central 网段和地址池 | [ZeroTier Central 网段和地址池检查](#zerotier-central-网段和地址池检查) |
 | 配置家里和公司 Windows | [4. 配置两台 Windows](#4-配置两台-windows)、[打开管理员 PowerShell](#打开管理员-powershell)、[执行 Windows 脚本](#执行-windows-脚本) |
 | 写入或修复 Windows 防火墙 | [写入防火墙规则](#写入防火墙规则)、[防火墙写入失败](#防火墙写入失败) |
 | 开始远程访问 | [5. 远程访问](#5-远程访问) |
+| 开启 TUN 或全局代理后远程不通 | [TUN 或全局代理开启后远程不通](#tun-或全局代理开启后远程不通) |
 | 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
 | 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
 | 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转) |
@@ -102,6 +104,41 @@ PROXY_PASSWORD=
 - Ubuntu 脚本默认读取项目根目录 `.env`。
 - Windows 脚本默认读取项目根目录 `.env`。
 - 只有多配置或非默认路径时，才需要使用 `--env <path>` 或 `-Env <path>`。
+
+#### ZeroTier Central 网段和地址池检查
+
+到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持下面这种简单配置：
+
+| 位置 | 应该保留 |
+|---|---|
+| `Managed Routes` | `10.246.77.0/24 (LAN)` |
+| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给三台机器手动固定 IP |
+| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
+
+不要把 `10.246.77.0/24` 填到 `Add Routes` 下面的 `Via` 里。`Via` 是“让某个节点转发某个网段”时才用；本项目默认只需要 `10.246.77.0/24 (LAN)`。
+
+如果页面里还有下面这些内容，建议删掉：
+
+- `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池。
+- 成员机器上的 `172.27.x.x` Managed IP。
+- 误填到地址池里的 `192.168.x.x`。
+
+三台机器最终只需要这些 ZeroTier IP：
+
+| 设备 | Managed IP |
+|---|---|
+| Ubuntu 节点 | `10.246.77.1` |
+| 家里 Windows 电脑 | `10.246.77.10` |
+| 公司 Windows 电脑 | `10.246.77.20` |
+
+调整后，在家里和公司两台 Windows 上重启 ZeroTier 并检查：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli listnetworks
+```
+
+`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
 
 ### 3. 配置 Ubuntu 节点
 
@@ -252,6 +289,35 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 远程工具本身建议走 ZeroTier 直连，不要强行走 Ubuntu 代理。这样延迟最低，也少一层转发。
 
+#### TUN 或全局代理开启后远程不通
+
+如果家里或公司电脑开启了 TUN、全局代理、加速器或其他接管系统流量的软件，远程可能变慢，甚至直接连不上。处理原则是：代理可以开，但 ZeroTier 网段和 ZeroTier 进程必须直连。
+
+在代理工具的直连或绕过规则里加入：
+
+```text
+10.246.77.0/24
+```
+
+如果代理工具支持按进程直连，把 ZeroTier 进程也加入直连。可用下面命令查看实际进程名和路径：
+
+```powershell
+Get-Process | Where-Object { $_.ProcessName -like "*ZeroTier*" } | Select-Object ProcessName,Path
+```
+
+远程工具本身也建议走直连；如果代理工具支持按进程规则，把远程工具的主进程、服务进程和辅助进程一起加入直连。
+
+改完后，两台 Windows 都执行：
+
+```powershell
+Restart-Service ZeroTierOneService
+zerotier-cli peers
+```
+
+公司访问家里时测 `ping -n 20 10.246.77.10`；家里访问公司时测 `ping -n 20 10.246.77.20`。
+
+如果 `peers` 里对方节点的 `path` 仍然显示为代理出口 IP，说明 ZeroTier 进程还在被 TUN 接管，需要继续检查代理工具的直连规则。
+
 ### 6. 给需要的软件配置代理
 
 代理入口：
@@ -363,6 +429,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 - Ubuntu、家里电脑、公司电脑都在同一个 ZeroTier 网络里，并且已授权。
 - 三台机器的 ZeroTier IP 分别是 `10.246.77.1`、`10.246.77.10`、`10.246.77.20`。
+- `zerotier-cli listnetworks` 里没有残留 `172.27.x.x`。
 - 家里和公司能互相访问对方的 ZeroTier IP。
 - 远程工具使用对方 ZeroTier IP 能连上。
 - 需要代理的软件使用 `10.246.77.1:10808` 能上网。
