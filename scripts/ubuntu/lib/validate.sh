@@ -20,7 +20,7 @@ ztg_validate_proxy_config() {
   fi
   if ztg_is_true "${PROXY_PUBLIC_ACCESS:-false}"; then
     if [ -z "${PROXY_CONNECT_HOST:-}" ] || [ "${PROXY_CONNECT_HOST:-}" = "${UBUNTU_ZT_IP:-}" ]; then
-      ztg_log_warn "PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST is not a server public IP. Clients may still use the slower ZeroTier entry."
+      ztg_log_warn "PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST still points to the ZeroTier private IP. This is OK for joined ZeroTier clients; non-ZeroTier clients need the server public IP."
     fi
     if [ -z "${PROXY_ALLOWED_CLIENT_CIDRS:-}" ]; then
       ztg_log_warn "PROXY_PUBLIC_ACCESS=true and PROXY_ALLOWED_CLIENT_CIDRS is empty. Public proxy access will allow all source IPs unless another firewall restricts it."

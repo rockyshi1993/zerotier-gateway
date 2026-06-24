@@ -16,6 +16,7 @@
 | 开始远程访问 | [5. 远程访问](#5-远程访问) |
 | 开启 TUN 或全局代理后远程不通 | [TUN 或全局代理开启后远程不通](#tun-或全局代理开启后远程不通) |
 | 家庭宽带没有公网 IPv4 | [常见问题](#常见问题) |
+| 不清楚加入 ZeroTier 后代理是否会自动生效 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理) |
 | 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
 | 代理测速慢，想走服务器公网入口 | [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
 | 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
@@ -41,7 +42,7 @@
 | 家里 Windows 电脑 | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
 | 公司 Windows 电脑 | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
-远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置代理，不改整台电脑的全局网络。默认代理入口是 `10.246.77.1:10808`；如果这个入口测速慢，可以按后文开启可选公网入口，让客户端直接连 Ubuntu 服务器公网 IP。
+远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置代理，不改整台电脑的全局网络。加入 ZeroTier 只代表电脑能访问 Ubuntu 的私有 IP，**不会自动让这台电脑代理上网**。默认代理入口是 `10.246.77.1:10808`；已经加入 ZeroTier 的电脑优先继续用这个私有入口，更安全。只有没加入 ZeroTier 的设备，或者你实测服务器公网 IP 路径更快时，才需要改用可选公网入口。
 
 上表是最小推荐结构。ZeroTier 网络里可以加入更多电脑，只要每台电脑有不同的 `10.246.77.x` 地址即可；本项目脚本默认只把“家里电脑”和“公司电脑”作为两台重点远程电脑来管理。
 
@@ -106,7 +107,7 @@ PROXY_PASSWORD=
 
 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
 
-`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。后续如果想优化代理测速，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，来源 IP 白名单也可选。白名单留空表示允许全部来源访问公网代理端口。
+`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。已经加入 ZeroTier 的 Windows 优先使用 `PROXY_CONNECT_HOST=10.246.77.1`，也就是软件里填 `10.246.77.1:10808`。后续如果要给没加入 ZeroTier 的设备使用代理，或实测服务器公网 IP 路径更快，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，来源 IP 白名单也可选。白名单留空表示允许全部来源访问公网代理端口。Windows 里的 `PROXY_CONNECT_HOST` 只影响本仓库生成的测试、PAC 和本地规则文件，不会自动修改系统代理。
 
 如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
 
@@ -190,7 +191,7 @@ sudo bash scripts/ubuntu/health-check.sh
 | 只访问其他电脑 | 加入 ZeroTier 并授权即可；远程工具填目标电脑的 ZeroTier IP |
 | 也要被别人远程访问 | 给这台电脑固定一个新的 `10.246.77.x`，并在这台电脑防火墙里放行允许访问它的对端 IP |
 
-如果你已经启用了代理公网入口，额外电脑的软件代理地址按 `.env` 里的 `PROXY_CONNECT_HOST:10808` 填，不再填 `10.246.77.1:10808`。
+如果额外电脑也加入了 ZeroTier，软件代理仍然优先填 `10.246.77.1:10808`，这条路只在你的 ZeroTier 私有网络里可访问。只有额外电脑没有加入 ZeroTier，或你特意想让它走服务器公网路径测速时，才填 `.env` 里的 `PROXY_CONNECT_HOST:10808`。
 
 推荐把额外电脑固定到 `10.246.77.30`、`10.246.77.31` 这类地址，避开：
 
@@ -381,7 +382,19 @@ zerotier-cli peers
 
 ### 6. 给需要的软件配置代理
 
-默认代理入口：
+先分清三件事：
+
+| 你做了什么 | 会发生什么 | 会不会自动代理上网 |
+|---|---|---|
+| Windows 加入 ZeroTier | Windows 能访问 Ubuntu 的 `10.246.77.1` | 不会 |
+| Ubuntu 安装代理服务 | Ubuntu 提供 `10.246.77.1:10808` 代理入口 | 不会接管 Windows |
+| 在某个软件里配置代理 | 这个软件的流量才会走代理 | 会，只对这个软件生效 |
+
+所以，本地电脑加入 ZeroTier 后，只是“能连到代理入口”。要代理上网，还要在需要代理的软件、系统代理、PAC 或本地规则客户端里主动配置。
+
+#### 最简单用法：只给某个软件填代理
+
+在需要代理的软件里填写：
 
 ```text
 地址：10.246.77.1
@@ -391,13 +404,37 @@ zerotier-cli peers
 密码：默认不填；启用认证时填 PROXY_PASSWORD
 ```
 
-如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。只在需要代理上网的软件里填这个代理；没有配置代理的软件继续走本机原网络。
+如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。没有配置代理的软件继续走本机原网络。
+
+这种方式最直观，但有一个限制：软件只知道“走这个代理”，不会自动读取你 `.env` 里的排除规则。要让域名/IP/进程排除规则生效，看下一节。
+
+#### 代理入口怎么选
+
+| 当前设备 | 推荐代理地址 |
+|---|---|
+| 已加入这个 ZeroTier 网络 | `10.246.77.1:10808` |
+| 没加入 ZeroTier | `服务器公网IP:10808` |
+| 已加入 ZeroTier，但实测公网路径更快 | `服务器公网IP:10808` |
+
+#### Windows 上更新代理配置是为了什么
+
+Windows 仓库里的 `.env` 不会自动修改系统代理，也不会自动让整台电脑走代理。它只给下面这些脚本使用：
+
+| 脚本 | 用 `.env` 做什么 |
+|---|---|
+| `test-proxy.ps1` | 测试 `PROXY_CONNECT_HOST:PROXY_PORT` 能不能连通 |
+| `generate-proxy-pac.ps1` | 生成带域名/IP 排除规则的 `artifacts/proxy.pac` |
+| `generate-client-rules.ps1` | 生成带域名/IP/进程排除规则的 `artifacts/windows-local-client.json` |
+
+如果你只是手动在某个软件里填 `10.246.77.1:10808`，Windows 这边不一定要同步 `.env`。如果你要用测试脚本、PAC 或本地规则客户端，就要让 Windows `.env` 里的代理字段和 Ubuntu 保持一致。
 
 #### 代理上网提速：可选公网入口
 
 如果你发现 `10.246.77.1:10808` 代理测速慢，但同一台 Ubuntu 服务器上的 Outline、v2rayN 或其他公网入口很快，通常原因是：本仓库默认代理入口走 ZeroTier 私有网络，客户端到 Ubuntu 的这段链路可能绕路；Outline/v2rayN 往往是直接连服务器公网 IP。
 
 这种情况下可以开启代理公网入口。它只优化“代理上网”，不改变远程控制路径。远程控制仍然优先走两台 Windows 的 ZeroTier IP。
+
+注意：开启公网入口只是让服务器公网 IP 也能访问代理，并不要求已经加入 ZeroTier 的 Windows 必须改用公网 IP。已加入 ZeroTier 的电脑如果 `10.246.77.1:10808` 速度正常，继续用这个私有入口更安全；没加入 ZeroTier 的设备，或实测公网路径更快时，才使用公网入口。
 
 在 Ubuntu 节点重新运行初始化脚本：
 
@@ -426,6 +463,13 @@ PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
+这里两个字段不要混淆：
+
+| 字段 | 作用 | 常见填法 |
+|---|---|---|
+| `PROXY_BIND_IP` | Ubuntu 代理监听在哪些网卡上 | 私有入口用 `10.246.77.1`；启用公网入口时用 `0.0.0.0` |
+| `PROXY_CONNECT_HOST` | Windows 生成测试、PAC、本地规则时连接哪个地址 | 已加入 ZeroTier 的电脑可继续用 `10.246.77.1`；没加入 ZeroTier 或要走公网路径时填服务器公网 IP |
+
 账号密码仍然可以不填；两项都留空时不启用认证。`PROXY_ALLOWED_CLIENT_CIDRS` 留空时，脚本会把 `10808` 按“全部来源”放行。这样最省事，但公网代理端口会直接暴露到互联网；长期使用时建议填写公司、家里公网 IP，或至少启用代理账号密码。
 
 让配置生效：
@@ -436,9 +480,9 @@ sudo bash scripts/ubuntu/install-proxy.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
-然后在 Windows 上更新代理配置：
+然后按实际使用方式处理 Windows：
 
-如果 Windows 仓库里也有一份 `.env`，先把下面这些代理字段同步成 Ubuntu 节点上的值；也可以在 Windows 重新运行 `.\scripts\windows\init-config.ps1`，输入同一套代理配置：
+如果只是手动给软件填代理，直接把软件里的地址改成你要使用的入口即可。如果要用 `test-proxy.ps1`、PAC 或本地规则客户端，则需要同步 Windows 仓库里的 `.env`。你可以手动同步下面字段，也可以在 Windows 重新运行 `.\scripts\windows\init-config.ps1`，输入同一套代理配置：
 
 ```text
 PROXY_PUBLIC_ACCESS
@@ -449,7 +493,7 @@ PROXY_USERNAME
 PROXY_PASSWORD
 ```
 
-否则 `test-proxy.ps1`、PAC 和本地规则客户端仍会使用旧的 `10.246.77.1:10808`。
+如果 Windows 已经加入 ZeroTier，并且你想继续走私有代理入口，`PROXY_CONNECT_HOST` 保持 `10.246.77.1` 即可；如果这台 Windows 没加入 ZeroTier，或你想测试服务器公网路径，就把 `PROXY_CONNECT_HOST` 改成服务器公网 IP。`test-proxy.ps1`、PAC 和本地规则客户端都会按这个字段生成入口。
 
 ```powershell
 .\scripts\windows\test-proxy.ps1
@@ -457,18 +501,10 @@ PROXY_PASSWORD
 .\scripts\windows\generate-client-rules.ps1
 ```
 
-手动给软件填代理时，地址改成 `.env` 里的 `PROXY_CONNECT_HOST`，端口仍然是 `10808`。例如：
-
-```text
-地址：服务器公网IP
-端口：10808
-协议：HTTP 或 SOCKS5
-```
-
 如果 `test-proxy.ps1` 仍然连不上，先检查三处：
 
-1. `PROXY_CONNECT_HOST` 是服务器公网 IP，不是 `10.246.77.1`。
-2. DigitalOcean 或其他云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
+1. 走私有入口时，Windows 能 ping 通 `10.246.77.1`，并且 Ubuntu 健康检查能看到 `10.246.77.1:10808` 或 `0.0.0.0:10808` 正在监听。
+2. 走公网入口时，`PROXY_CONNECT_HOST` 是服务器公网 IP，云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
 3. 如果 `PROXY_ALLOWED_CLIENT_CIDRS` 留空，Ubuntu 的 `ufw` 会允许全部来源访问 `10808/tcp`；如果填写了白名单，只会放行白名单里的来源。
 
 #### 后续启用或修改代理账号密码
@@ -511,7 +547,17 @@ sudo bash scripts/ubuntu/health-check.sh
 
 ### 7. 排除 IP、域名或进程
 
-如果只是排除域名或 IP，编辑 `.env`：
+排除规则不会因为写进 `.env` 就立刻生效。它取决于你把规则用在哪里：
+
+| 想排除什么 | 使用方式 | 什么时候生效 | 不能做什么 |
+|---|---|---|---|
+| 域名、域名后缀、IP 网段 | 生成 PAC | 浏览器、系统代理或软件使用这个 PAC 时生效 | 不能按进程判断 |
+| 域名、IP、进程 | 生成本地规则客户端配置 | 你把 `windows-local-client.json` 导入本地规则客户端，并由它接管流量时生效 | 仅生成文件不会接管流量 |
+| 某个软件手动填代理 | 软件自己的代理设置 | 只对这个软件生效 | 本仓库的排除规则不会自动套进去 |
+
+#### 排除域名或 IP
+
+编辑 `.env`：
 
 ```text
 DIRECT_DOMAINS=localhost,*.local,*.company.com
@@ -527,7 +573,13 @@ DIRECT_IP_CIDRS=10.246.77.0/24,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 输出文件在 `artifacts/proxy.pac`。
 
-如果要按进程排除，编辑 `.env`：
+把这个 PAC 配到浏览器、系统代理或支持 PAC 的软件里后，域名和 IP 排除才会生效。
+
+#### 排除进程
+
+进程排除只能在 Windows 本机通过本地规则客户端实现。Ubuntu 代理只能看到网络请求，看不到 Windows 上的进程名。
+
+编辑 `.env`：
 
 ```text
 PROXY_MODE=local-rule-client
@@ -544,6 +596,8 @@ DIRECT_PROCESS_PATH_REGEX=
 ```
 
 输出文件在 `artifacts/windows-local-client.json`。本仓库负责生成规则文件，实际接管进程流量需要导入你正在使用的本地规则客户端。
+
+多进程软件不要只填一个主程序名。应按安装目录、路径正则或完整进程名清单一起处理；如果软件会启动服务进程、辅助进程或更新进程，也要一并加入规则。
 
 ### 8. 远程直连不稳定时，再开启中转
 
@@ -701,7 +755,7 @@ sudo apt-get update
 sudo apt-get install -y netcat-openbsd
 ```
 
-安装后再执行 `nc -vz`。成功时应看到 `succeeded`。如果命令能运行但连接失败，去对应 Windows 上重新写入防火墙规则。最新脚本会同时放行对端 Windows IP 和 `.env` 里的 `UBUNTU_ZT_IP`，所以先确认 Windows 的 `.env` 里 `UBUNTU_ZT_IP` 是当前中转服务器，比如第一台是 `10.246.77.1`，新加坡这台是 `10.246.77.2`。
+安装后再执行 `nc -vz`。成功时应看到 `succeeded`。如果命令能运行但连接失败，去对应 Windows 上重新写入防火墙规则。最新脚本会同时放行对端 Windows IP 和 `.env` 里的 `UBUNTU_ZT_IP`，所以先确认 Windows 的 `.env` 里 `UBUNTU_ZT_IP` 是当前中转服务器，比如第一台是 `10.246.77.1`，第二台可以是 `10.246.77.2`。
 
 家里电脑：
 
@@ -742,7 +796,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 - `zerotier-cli listnetworks` 里没有残留 `172.27.x.x`。
 - 家里和公司能互相访问对方的 ZeroTier IP。
 - 远程工具使用对方 ZeroTier IP 能连上。
-- 需要代理的软件使用代理入口能上网：默认是 `10.246.77.1:10808`，启用公网入口后是 `PROXY_CONNECT_HOST:10808`。
+- 需要代理的软件使用代理入口能上网：已加入 ZeroTier 的电脑优先用 `10.246.77.1:10808`；没加入 ZeroTier 或实测公网路径更快时，用 `PROXY_CONNECT_HOST:10808`。
 - 不需要代理的软件仍然走本机原网络。
 - 如果配置了排除规则，PAC 或本地客户端规则已经重新生成。
 

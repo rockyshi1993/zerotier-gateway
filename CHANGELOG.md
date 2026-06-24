@@ -5,6 +5,8 @@
 ## [未发布]
 
 ### 修复
+- 澄清代理生效机制：加入 ZeroTier 只代表能访问 Ubuntu 私有代理入口，不会自动代理上网；手动代理、PAC 和本地规则客户端分别有不同生效范围。
+- 澄清代理公网入口与 ZeroTier 私有入口的关系：已加入 ZeroTier 的客户端可继续使用 `10.246.77.1:10808`，更安全；没加入 ZeroTier 的设备，或实测服务器公网路径更快时，才使用 `PROXY_CONNECT_HOST:10808`。
 - Windows 防火墙计划现在会同时生成对端 Windows 直连规则和 `UBUNTU_ZT_IP` 中转规则；README、安装指南、Windows/中转/排障文档同步说明第一台中转服务器也需要目标 Windows 放行，切换新中转服务器时可通过同步 `.env` 后重跑 `setup.ps1 -ApplyFirewall` 自动更新。
 - README、安装指南和中转文档补充多台 Ubuntu 中转服务器的切换流程，说明新服务器需要独立 ZeroTier IP、目标 Windows 需要放行新服务器 IP，并补充切换后的 Windows 验证命令；验收清单补充更多设备授权和 IP 冲突检查；测试覆盖第二台中转服务器的 dry-run 渲染。
 - README、安装指南和 Windows 文档补充两台以上电脑加入 ZeroTier 时的处理方式，说明额外电脑只用代理时不需要执行 `setup.ps1`，需要被远程访问时应单独放行对应 ZeroTier IP。

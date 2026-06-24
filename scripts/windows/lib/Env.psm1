@@ -76,7 +76,7 @@ function Assert-ZtgEnv {
   }
   if ($publicAccess) {
     if ([string]::IsNullOrWhiteSpace([string]$Config['PROXY_CONNECT_HOST']) -or [string]$Config['PROXY_CONNECT_HOST'] -eq [string]$Config['UBUNTU_ZT_IP']) {
-      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST is not a server public IP. Clients may still use the slower ZeroTier entry.'
+      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST still points to the ZeroTier private IP. This is OK for joined ZeroTier clients; non-ZeroTier clients need the server public IP.'
     }
     if ([string]::IsNullOrWhiteSpace([string]$Config['PROXY_ALLOWED_CLIENT_CIDRS'])) {
       Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true and PROXY_ALLOWED_CLIENT_CIDRS is empty. Public proxy access will allow all source IPs unless another firewall restricts it.'
