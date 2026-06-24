@@ -13,6 +13,7 @@
 | 写入或修复 Windows 防火墙 | [写入防火墙规则](#写入防火墙规则)、[防火墙写入失败](#防火墙写入失败) |
 | 开始远程访问 | [5. 远程访问](#5-远程访问) |
 | 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
+| 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
 | 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转) |
 | 检查是否配置成功 | [9. 最终验收](#9-最终验收) |
 | 查看常见选择和更多文档 | [常见选择](#常见选择)、[文档入口](#文档入口) |
@@ -264,6 +265,38 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。只在需要代理上网的软件里填这个代理；没有配置代理的软件继续走本机原网络。
+
+#### 后续启用或修改代理账号密码
+
+可以后续重新配置，不需要重新加入 ZeroTier，也不需要从头安装整套网络。代理服务跑在 Ubuntu 节点上，所以最终以 Ubuntu 节点项目根目录里的 `.env` 为准。
+
+在 Ubuntu 节点的仓库目录重新运行初始化脚本：
+
+```bash
+cd ~/zerotier-gateway
+bash scripts/ubuntu/init-config.sh
+```
+
+脚本检测到已有 `.env` 时，直接回车会沿用旧值；走到“是否启用代理用户名和密码”时按需要选择：
+
+- 想启用或修改账号密码：选择启用，然后输入新的用户名和密码。
+- 想关闭账号密码：选择不启用，脚本会把 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 清空。
+
+然后只刷新 Ubuntu 代理服务：
+
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh
+sudo bash scripts/ubuntu/health-check.sh
+```
+
+刷新后同步客户端：
+
+- 手动给软件填代理的：在软件代理设置里填新的用户名和密码；如果已经关闭认证，就把软件里的用户名和密码也清空。
+- 使用 `artifacts/windows-local-client.json` 的：把 Windows 仓库里的 `.env` 也改成同一套账号密码，然后重新生成本地规则：
+
+```powershell
+.\scripts\windows\generate-client-rules.ps1
+```
 
 测试代理：
 

@@ -96,6 +96,7 @@ cd E:\Worker\zerotier-gateway
 2. sing-box 服务正在运行。
 3. 代理监听在 `10.246.77.1:10808`。
 4. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
+5. 如果刚修改过代理账号密码，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件或本地规则也已经同步成同一套账号密码。
 
 如果 Ubuntu 上看到：
 
