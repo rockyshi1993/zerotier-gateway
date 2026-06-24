@@ -55,6 +55,19 @@ sudo bash scripts/ubuntu/install.sh
 
 `scripts/ubuntu/install-proxy.sh` 是单独修代理时用的子脚本；主流程不需要直接运行它。
 
+如果安装时看到：
+
+```text
+Unable to locate package sing-box
+```
+
+说明当前 Ubuntu 源里没有 sing-box 包。更新到最新脚本后重新执行主安装命令，脚本会自动添加官方 SagerNet apt 源后继续安装：
+
+```bash
+git pull
+sudo bash scripts/ubuntu/install.sh
+```
+
 运行：
 
 ```powershell

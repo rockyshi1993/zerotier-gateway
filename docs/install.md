@@ -134,6 +134,8 @@ sudo bash scripts/ubuntu/install.sh
 
 `install.sh` 会同时安装 ZeroTier 和代理服务。普通安装只需要跑这一条，不需要手动找其他安装脚本。
 
+如果安装时看到 `Unable to locate package sing-box`，说明当前 Ubuntu 源里没有 sing-box 包。更新到最新脚本后重新执行 `sudo bash scripts/ubuntu/install.sh`，脚本会自动添加官方 SagerNet apt 源后继续安装。
+
 到 ZeroTier Central 完成三件事：
 
 1. 找到 Ubuntu 节点。

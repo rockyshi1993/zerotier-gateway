@@ -106,6 +106,8 @@ sudo bash scripts/ubuntu/health-check.sh
 
 `install.sh` 会同时安装 ZeroTier 和代理服务。普通安装只需要跑这一条；如果 `health-check.sh` 提示 `sing-box-zt-proxy.service could not be found`，说明代理服务没有装上，先重新执行 `sudo bash scripts/ubuntu/install.sh`。
 
+如果安装时看到 `Unable to locate package sing-box`，说明当前 Ubuntu 源里没有 sing-box 包。更新到最新脚本后重新执行 `sudo bash scripts/ubuntu/install.sh`，脚本会自动添加官方 SagerNet apt 源后继续安装。
+
 然后到 ZeroTier Central：
 
 1. 找到刚加入网络的 Ubuntu 节点。
