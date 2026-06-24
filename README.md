@@ -280,7 +280,28 @@ cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
-`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。家里电脑的规则会放行公司电脑的 ZeroTier IP，公司电脑的规则会放行家里电脑的 ZeroTier IP。
+`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。脚本会写入两类规则：
+
+| 规则 | 用途 |
+|---|---|
+| 对端 Windows IP | 家里和公司通过 ZeroTier 直连远程 |
+| `UBUNTU_ZT_IP` | 直连不稳定时，允许 Ubuntu 中转服务器转发到这台 Windows |
+
+默认配置下，家里电脑会放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑会放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。如果你后续把中转服务器换成 `10.246.77.2`，先同步 Windows 这边 `.env` 里的 `UBUNTU_ZT_IP=10.246.77.2`，再在目标 Windows 上重跑对应的 `setup.ps1 -Role ... -ApplyFirewall`。
+
+查看脚本写入了哪些规则：
+
+```powershell
+# 家里电脑查看 Home 规则；公司电脑把 Home 改成 Work
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Select-Object DisplayName,Enabled,Direction,Action,Profile
+
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Get-NetFirewallAddressFilter |
+  Format-List RemoteAddress
+```
+
+家里电脑应该能看到 `ZT Gateway Remote Inbound Home 3389` 和 `ZT Gateway Relay Inbound Home 3389`。其中 `Remote` 规则放行公司电脑，`Relay` 规则放行当前 Ubuntu 中转服务器。如果你手动创建了别的规则名，例如 `ZT Relay Singapore Inbound 3389`，只有手动创建成功后才能用这个名字查询；脚本自动生成的规则名不是这个。
 
 #### 防火墙写入失败
 
@@ -537,6 +558,8 @@ DIRECT_PROCESS_PATH_REGEX=
 
 `RELAY_PORT=443` 表示第一个中转入口从 `443` 开始；如果 `REMOTE_PORTS` 有多个端口，脚本会继续使用后续端口。Ubuntu 只监听自己的 ZeroTier IP，不把远程端口暴露到公网。
 
+被中转访问的 Windows 必须允许当前 Ubuntu 中转服务器访问远程端口。最新脚本会在你执行 `setup.ps1 -Role Home -ApplyFirewall` 或 `setup.ps1 -Role Work -ApplyFirewall` 时自动放行 `.env` 里的 `UBUNTU_ZT_IP`。默认第一台中转服务器是 `10.246.77.1`，所以不需要额外手动加一条 `10.246.77.1` 规则；只有你还在使用旧脚本、Windows `.env` 没同步，或公司安全软件阻止脚本写入时，才需要手动添加。
+
 #### 多台中转服务器怎么切换
 
 可以让多台 Ubuntu 服务器加入同一个 ZeroTier 网络，每台服务器都要有不同的 ZeroTier IP。示例：
@@ -563,18 +586,34 @@ sudo bash scripts/ubuntu/install-relay.sh --dry-run
 sudo bash scripts/ubuntu/install-relay.sh
 ```
 
-切换中转服务器时，Windows 通常不用安装新东西，也不用重跑 `setup.ps1`。你只需要把远程工具里的地址从旧服务器换成新服务器：
+切换中转服务器时，Windows 不需要安装中转服务。你需要把远程工具里的地址从旧服务器换成新服务器：
 
 | 远程方向 | 旧服务器 | 新服务器 |
 |---|---|---|
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
 
-但被中转访问的 Windows 必须允许新服务器访问远程端口。如果 Windows 防火墙已经放行可信的 `10.246.77.0/24`，通常不需要再加规则；如果只放行了对方电脑 IP 或旧服务器 IP，就要额外放行新服务器 IP：
+但被中转访问的 Windows 必须允许新服务器访问远程端口。如果 Windows 防火墙已经放行可信的 `10.246.77.0/24`，通常不需要再加规则；如果只放行了对方电脑 IP 或旧服务器 IP，请同步 Windows 这边的 `.env`，把 `UBUNTU_ZT_IP` 改成新服务器 IP 后重跑对应角色的防火墙脚本。
+
+目标是家里电脑，就在家里电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+目标是公司电脑，就在公司电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
+如果暂时不方便更新脚本或同步 `.env`，可以在目标 Windows 的管理员 PowerShell 里手动加规则。下面例子表示允许新服务器 `10.246.77.2` 访问这台 Windows 的 `3389`：
 
 ```powershell
 New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
 ```
+
+手动规则的 `DisplayName` 可以自己定。后续查询时必须使用你实际创建的名字；如果你没有创建过 `ZT Relay Singapore Inbound 3389`，用这个名字查询会提示找不到对象。
 
 切换后先从 Windows 验证新服务器入口：
 
@@ -655,14 +694,14 @@ nc -vz 10.246.77.10 3389
 nc -vz 10.246.77.20 3389
 ```
 
-如果提示没有 `nc`，先安装：
+如果提示没有 `nc` 或 `nc: command not found`，先安装：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y netcat-openbsd
 ```
 
-`nc` 成功时应看到 `succeeded`。如果 Ubuntu 访问某台 Windows 的 `3389` 失败，去对应 Windows 上重新写入防火墙规则：
+安装后再执行 `nc -vz`。成功时应看到 `succeeded`。如果命令能运行但连接失败，去对应 Windows 上重新写入防火墙规则。最新脚本会同时放行对端 Windows IP 和 `.env` 里的 `UBUNTU_ZT_IP`，所以先确认 Windows 的 `.env` 里 `UBUNTU_ZT_IP` 是当前中转服务器，比如第一台是 `10.246.77.1`，新加坡这台是 `10.246.77.2`。
 
 家里电脑：
 

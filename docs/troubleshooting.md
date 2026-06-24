@@ -71,11 +71,19 @@ cd E:\Worker\zerotier-gateway
 6. 家里电脑重新执行 `.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall`。
 7. 公司电脑重新执行 `.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall`。
 
-如果公司电脑或安全软件禁止修改防火墙，请在系统防火墙里手动允许对端 ZeroTier IP 访问远程端口。默认示例里，家里电脑放行 `10.246.77.20`，公司电脑放行 `10.246.77.10`。
+最新脚本会同时写入两类规则：对端 Windows 的 ZeroTier IP 用于直连，`.env` 里的 `UBUNTU_ZT_IP` 用于中转。如果公司电脑或安全软件禁止修改防火墙，请在系统防火墙里手动允许对应来源访问远程端口。默认示例里，家里电脑放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。
 
 如果是第三台或更多 Windows 加入 ZeroTier，`setup.ps1 -Role Home/Work` 不会自动管理这些额外电脑。额外电脑只用代理或只访问别人时不需要执行 `setup.ps1`；如果它也要被远程访问，请在额外电脑上手动放行允许访问它的对端 ZeroTier IP，或放行可信的 `10.246.77.0/24`。
 
-如果你新增了另一台 Ubuntu 中转服务器，Windows 不需要安装中转服务；但目标 Windows 必须允许新服务器的 ZeroTier IP 访问远程端口。比如新服务器是 `10.246.77.2`，目标 Windows 只放行过旧服务器或对方电脑 IP，就需要额外放行 `10.246.77.2`。如果已经放行可信的 `10.246.77.0/24`，通常不用再加规则。
+如果你新增了另一台 Ubuntu 中转服务器，Windows 不需要安装中转服务；但目标 Windows 必须允许新服务器的 ZeroTier IP 访问远程端口。比如新服务器是 `10.246.77.2`，目标 Windows 只放行过旧服务器或对方电脑 IP，就需要同步 Windows `.env` 里的 `UBUNTU_ZT_IP=10.246.77.2`，再重跑对应角色的 `setup.ps1 -ApplyFirewall`。如果已经放行可信的 `10.246.77.0/24`，通常不用再加规则。
+
+旧脚本或临时补救时，也可以在目标 Windows 的管理员 PowerShell 手动添加：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
+```
+
+手动规则的 `DisplayName` 可以自己定，但后续查询必须使用实际创建过的名字。脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`；如果你没有创建过 `ZT Relay Singapore Inbound 3389`，用这个名字查询会提示找不到对象。
 
 ## ZeroTier 无法连通
 

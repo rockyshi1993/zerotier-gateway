@@ -17,6 +17,8 @@
 
 `RELAY_PORT` 是第一个监听端口，`REMOTE_PORTS` 是 Windows 远程端口列表。脚本会按“家里、公司”的顺序为每个远程端口分配两个连续监听端口。
 
+被中转访问的 Windows 必须允许当前 Ubuntu 中转服务器访问远程端口。最新 Windows 脚本会在执行 `setup.ps1 -Role Home -ApplyFirewall` 或 `setup.ps1 -Role Work -ApplyFirewall` 时，自动放行 `.env` 里的 `UBUNTU_ZT_IP`。默认第一台中转服务器是 `10.246.77.1`，所以普通首次流程不需要额外手动加防火墙规则。
+
 ## 多台中转服务器
 
 可以有多台 Ubuntu 服务器加入同一个 ZeroTier 网络。每台服务器必须使用不同的 ZeroTier IP，例如：
@@ -50,11 +52,27 @@ sudo bash scripts/ubuntu/install-relay.sh
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
 
-目标 Windows 需要允许新服务器访问远程端口。如果 Windows 防火墙已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了某一台电脑或旧服务器，请增加新服务器的 ZeroTier IP：
+目标 Windows 需要允许新服务器访问远程端口。如果 Windows 防火墙已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了某一台电脑或旧服务器，请先同步目标 Windows 的 `.env`，把 `UBUNTU_ZT_IP` 改成新服务器 IP，然后在目标 Windows 上重跑对应角色的脚本。
+
+目标是家里电脑，就在家里电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+目标是公司电脑，就在公司电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
+如果暂时不能同步 `.env` 或更新脚本，也可以手动增加新服务器的 ZeroTier IP。下面例子表示允许新服务器 `10.246.77.2` 访问这台 Windows 的 `3389`：
 
 ```powershell
 New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
 ```
+
+手动规则的 `DisplayName` 可以自己定。脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`；查询防火墙规则时要使用实际存在的名字。
 
 切换后先从 Windows 验证新服务器入口：
 
@@ -131,12 +149,14 @@ nc -vz 10.246.77.10 3389
 nc -vz 10.246.77.20 3389
 ```
 
-如果没有 `nc`：
+如果没有 `nc` 或看到 `nc: command not found`：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y netcat-openbsd
 ```
+
+安装后再执行 `nc -vz`。如果命令能运行但连接失败，优先回到目标 Windows，确认最新 `setup.ps1 -ApplyFirewall` 已经按当前 `.env` 放行 `UBUNTU_ZT_IP`。第一台中转服务器通常是 `10.246.77.1`；切换到新服务器时可能是 `10.246.77.2`。
 
 如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
 

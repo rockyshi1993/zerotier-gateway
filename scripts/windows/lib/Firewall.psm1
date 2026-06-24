@@ -18,6 +18,7 @@ function New-ZtgFirewallPlan {
   )
 
   $remoteIp = Get-ZtgRemotePeerIp -Config $Config -Role $Role
+  $relayIp = ([string]$Config['UBUNTU_ZT_IP']).Trim()
   $ports = @([string]$Config['REMOTE_PORTS'] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   foreach ($port in $ports) {
     [pscustomobject]@{
@@ -27,6 +28,16 @@ function New-ZtgFirewallPlan {
       LocalPort = $port
       RemoteAddress = $remoteIp
       Action = 'Allow'
+    }
+    if ($relayIp -and $relayIp -ne $remoteIp) {
+      [pscustomobject]@{
+        DisplayName = "ZT Gateway Relay Inbound $Role $port"
+        Direction = 'Inbound'
+        Protocol = 'TCP'
+        LocalPort = $port
+        RemoteAddress = $relayIp
+        Action = 'Allow'
+      }
     }
   }
 }
@@ -56,6 +67,7 @@ function Apply-ZtgFirewallPlan {
 function Remove-ZtgFirewallRules {
   Assert-ZtgFirewallAdministrator
   Get-NetFirewallRule -DisplayName 'ZT Gateway Remote Inbound *' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
+  Get-NetFirewallRule -DisplayName 'ZT Gateway Relay Inbound *' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
 }
 
 Export-ModuleMember -Function Get-ZtgRemotePeerIp,New-ZtgFirewallPlan,Test-ZtgWindowsAdministrator,Assert-ZtgFirewallAdministrator,Apply-ZtgFirewallPlan,Remove-ZtgFirewallRules

@@ -51,7 +51,30 @@ cd E:\Worker\zerotier-gateway
 
 脚本会先打印防火墙计划。确认计划正确后，再追加 `-ApplyFirewall` 真正写入规则。
 
+防火墙计划会包含两类入站规则：
+
+| 规则 | 用途 |
+|---|---|
+| 对端 Windows IP | 家里和公司通过 ZeroTier 直连远程 |
+| `UBUNTU_ZT_IP` | 直连不稳定时，允许 Ubuntu 中转服务器转发到这台 Windows |
+
 `-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。如果某台 Windows 只加入 ZeroTier 网络，但不需要被另一台电脑远程访问，也不需要本项目生成规则，可以不执行 `setup.ps1`。
+
+如果你有多台 Ubuntu 中转服务器，目标 Windows 只需要允许“当前要用的中转服务器”访问远程端口。同步 Windows `.env` 里的 `UBUNTU_ZT_IP` 后，重跑对应角色的 `setup.ps1 -ApplyFirewall` 即可自动更新规则。手动 `New-NetFirewallRule` 只适合旧脚本或临时补救。
+
+查看脚本写入的规则：
+
+```powershell
+# 家里电脑查看 Home 规则；公司电脑把 Home 改成 Work
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Select-Object DisplayName,Enabled,Direction,Action,Profile
+
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Get-NetFirewallAddressFilter |
+  Format-List RemoteAddress
+```
+
+脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`。如果你手动创建了自定义规则名，查询时要使用实际创建过的名字。
 
 ## 更多 Windows 电脑
 

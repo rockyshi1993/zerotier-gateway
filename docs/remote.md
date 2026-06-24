@@ -54,6 +54,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 公司电脑把 `Home` 改成 `Work`。
 
+规则预览里应该看到两类来源：对端 Windows 的 ZeroTier IP 用于直连，`.env` 里的 `UBUNTU_ZT_IP` 用于中转。默认第一台中转服务器是 `10.246.77.1`；如果改用新服务器，例如 `10.246.77.2`，先同步 Windows `.env` 后再重跑防火墙脚本。
+
 如果看到 `New-NetFirewallRule : 拒绝访问。` 或 `Windows System Error 5`，请关闭当前窗口，右键 PowerShell 选择“以管理员身份运行”，进入项目目录后重新执行。
 
 不要把远程桌面或远程控制端口暴露到公网。

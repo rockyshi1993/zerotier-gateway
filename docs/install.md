@@ -303,7 +303,28 @@ cd E:\Worker\zerotier-gateway
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
-`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。家里电脑的规则会放行公司电脑的 ZeroTier IP，公司电脑的规则会放行家里电脑的 ZeroTier IP。
+`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。脚本会写入两类规则：
+
+| 规则 | 用途 |
+|---|---|
+| 对端 Windows IP | 家里和公司通过 ZeroTier 直连远程 |
+| `UBUNTU_ZT_IP` | 直连不稳定时，允许 Ubuntu 中转服务器转发到这台 Windows |
+
+默认配置下，家里电脑会放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑会放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。如果后续切换到新的中转服务器，例如 `10.246.77.2`，先同步 Windows 这边 `.env` 里的 `UBUNTU_ZT_IP=10.246.77.2`，再在目标 Windows 上重跑对应角色的 `setup.ps1 -ApplyFirewall`。
+
+查看脚本写入了哪些规则：
+
+```powershell
+# 家里电脑查看 Home 规则；公司电脑把 Home 改成 Work
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Select-Object DisplayName,Enabled,Direction,Action,Profile
+
+Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
+  Get-NetFirewallAddressFilter |
+  Format-List RemoteAddress
+```
+
+脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`。手动规则可以用别的名字；查询时必须使用实际创建过的名字。
 
 如果写入防火墙时看到：
 
@@ -582,6 +603,8 @@ sudo bash scripts/ubuntu/install-relay.sh --dry-run
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.10:3389` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.20:3389` |
 
+被中转访问的 Windows 必须允许当前 Ubuntu 中转服务器访问远程端口。最新 `setup.ps1 -ApplyFirewall` 会自动放行 `.env` 里的 `UBUNTU_ZT_IP`，所以第一台中转服务器 `10.246.77.1` 不需要额外手动加规则。只有旧脚本、Windows `.env` 没同步，或安全软件阻止脚本写入时，才需要手动添加防火墙规则。
+
 ### 多台中转服务器怎么切换
 
 可以把多台 Ubuntu 服务器加入同一个 ZeroTier 网络。每台服务器都要有自己的固定 ZeroTier IP，例如旧服务器是 `10.246.77.1`，新服务器是 `10.246.77.2`。
@@ -610,11 +633,27 @@ sudo bash scripts/ubuntu/install-relay.sh
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
 
-Windows 不需要安装中转服务。只有“被中转访问”的目标 Windows 需要允许新服务器访问远程端口。如果已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了对方电脑 IP 或旧服务器 IP，请在目标 Windows 的管理员 PowerShell 里增加新服务器：
+Windows 不需要安装中转服务。只有“被中转访问”的目标 Windows 需要允许新服务器访问远程端口。如果已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了对方电脑 IP 或旧服务器 IP，请先同步 Windows 这边 `.env` 里的 `UBUNTU_ZT_IP`，再在目标 Windows 上重跑对应角色的脚本。
+
+目标是家里电脑，就在家里电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
+```
+
+目标是公司电脑，就在公司电脑执行：
+
+```powershell
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+```
+
+如果暂时不能同步 `.env` 或更新脚本，也可以在目标 Windows 的管理员 PowerShell 里手动增加新服务器。下面例子表示允许新服务器 `10.246.77.2` 访问这台 Windows 的 `3389`：
 
 ```powershell
 New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
 ```
+
+手动规则的 `DisplayName` 可以自己定。后续查询时必须使用你实际创建的名字；如果没有创建过某个名字，`Get-NetFirewallRule -DisplayName` 会提示找不到对象。
 
 切换后先从 Windows 验证新服务器入口：
 
