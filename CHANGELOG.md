@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 修复
+- Ubuntu 中转脚本现在会生成可用的 systemd socket/service，使用 `systemd-socket-proxyd` 把 Ubuntu ZeroTier 入口转发到家里和公司 Windows 远程端口，不再只输出“需要自行安装 relay”的提示。
 - Windows 防火墙规则写入现在会先检查管理员 PowerShell，`New-NetFirewallRule` 或 `Remove-NetFirewallRule` 失败时会立即停止，不再误报已应用。
 - README、安装指南和故障排查补充 `拒绝访问` / `Windows System Error 5` 的处理步骤，并说明哪些 Windows 电脑需要执行脚本。
 - README 和 Windows 安装文档补充管理员权限确认命令，拆分 `Home` / `Work` 执行块，避免用户在同一台电脑跑错角色。

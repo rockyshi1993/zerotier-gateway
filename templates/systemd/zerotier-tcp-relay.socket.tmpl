@@ -1,0 +1,12 @@
+[Unit]
+Description=${RELAY_UNIT_DESCRIPTION}
+After=network-online.target
+Wants=network-online.target
+
+[Socket]
+ListenStream=${RELAY_LISTEN}
+NoDelay=true
+FreeBind=true
+
+[Install]
+WantedBy=sockets.target

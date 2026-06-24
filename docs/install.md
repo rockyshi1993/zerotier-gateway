@@ -476,11 +476,20 @@ Ubuntu 上预览：
 sudo bash scripts/ubuntu/install-relay.sh --dry-run
 ```
 
-安装：
+默认 `REMOTE_PORTS=3389`、`RELAY_PORT=443` 时，预览里会看到：
+
+| 远程方向 | 连接地址 | 实际转发到 |
+|---|---|---|
+| 公司访问家里 | `10.246.77.1:443` | `10.246.77.10:3389` |
+| 家里访问公司 | `10.246.77.1:444` | `10.246.77.20:3389` |
+
+确认方向正确后安装：
 
 ```bash
 sudo bash scripts/ubuntu/install-relay.sh
 ```
+
+安装后，把远程工具里的地址临时改成上表的 Ubuntu 中转地址。直连恢复稳定后，再切回对方 Windows 的 ZeroTier IP。
 
 停用：
 

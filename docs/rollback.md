@@ -14,6 +14,8 @@ sudo bash scripts/ubuntu/uninstall.sh
 sudo bash scripts/ubuntu/disable-relay.sh
 ```
 
+该命令会停用并移除本项目生成的 `zerotier-gateway-relay-*.socket` 和 `zerotier-gateway-relay-*.service`。默认不会影响 ZeroTier 本身和代理服务。
+
 ## Windows
 
 用管理员 PowerShell 移除本项目创建的 Windows 防火墙规则：
