@@ -35,7 +35,7 @@
 你需要准备：
 
 1. 一个 ZeroTier 账号，并在 [ZeroTier Central](https://my.zerotier.com) 创建一个私有网络。
-2. 复制这个网络的 16 位网络编号，后面填到 `.env` 的 `ZEROTIER_NETWORK_ID`。
+2. 复制这个网络的 16 位网络编号，初始化脚本会问你这个编号。
 3. 一台 Ubuntu 机器，能使用 `sudo`。
 4. 家里和公司两台 Windows 电脑，能用管理员身份打开 PowerShell。
 5. 两台 Windows 上已经安装好你平时使用的远程工具，远程地址改填对方的 ZeroTier IP。
@@ -59,24 +59,26 @@ git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd .\zerotier-gateway
 ```
 
-### 2. 填写 `.env`
+### 2. 生成配置
 
-复制配置样例：
+运行初始化脚本，按提示输入 ZeroTier 网络编号和三台机器的 IP。一路回车会使用推荐默认值。
+
+Ubuntu：
 
 ```bash
-cp config/example.env .env
+bash scripts/ubuntu/init-config.sh
 ```
 
 Windows PowerShell：
 
 ```powershell
-Copy-Item .\config\example.env .\.env
+.\scripts\windows\init-config.ps1
 ```
 
-打开 `.env`，至少填这些值：
+脚本会在项目根目录生成 `.env`。最关键的几项会是这样：
 
 ```text
-ZEROTIER_NETWORK_ID=你的 ZeroTier 网络编号
+ZEROTIER_NETWORK_ID=你输入的 ZeroTier 网络编号
 UBUNTU_ZT_IP=10.246.77.1
 HOME_PC_ZT_IP=10.246.77.10
 WORK_PC_ZT_IP=10.246.77.20
@@ -85,6 +87,8 @@ PROXY_PASSWORD=
 ```
 
 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
+
+如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
 
 默认配置行为：
 

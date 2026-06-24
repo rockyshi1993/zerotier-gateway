@@ -9,6 +9,7 @@ Ubuntu 节点负责提供：
 ## 常用命令
 
 ```bash
+bash scripts/ubuntu/init-config.sh
 sudo bash scripts/ubuntu/install.sh --dry-run
 sudo bash scripts/ubuntu/install.sh
 sudo bash scripts/ubuntu/health-check.sh

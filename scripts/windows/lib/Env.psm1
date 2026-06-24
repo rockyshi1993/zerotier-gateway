@@ -7,7 +7,7 @@ function Read-ZtgEnv {
 
   $resolved = Resolve-ZtgPath $Path
   if (-not (Test-Path -LiteralPath $resolved)) {
-    throw "Config file not found: $resolved. Copy config/example.env to .env in the project root, then edit it."
+    throw "Config file not found: $resolved. Run .\scripts\windows\init-config.ps1 first."
   }
 
   $envMap = [ordered]@{}

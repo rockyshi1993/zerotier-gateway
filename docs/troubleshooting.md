@@ -7,13 +7,13 @@
 修复方式：
 
 ```bash
-cp config/example.env .env
+bash scripts/ubuntu/init-config.sh
 ```
 
 Windows：
 
 ```powershell
-Copy-Item .\config\example.env .\.env
+.\scripts\windows\init-config.ps1
 ```
 
 ## ZeroTier 无法连通

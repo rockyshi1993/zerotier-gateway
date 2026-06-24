@@ -36,7 +36,7 @@ ztg_parse_common_args() {
 ztg_load_env() {
   if [ ! -f "$ZTG_ENV_FILE" ]; then
     ztg_log_error "Config file not found: $ZTG_ENV_FILE"
-    ztg_log_error "Copy config/example.env to .env in the project root, then edit it."
+    ztg_log_error "Run: bash scripts/ubuntu/init-config.sh"
     exit 1
   fi
 

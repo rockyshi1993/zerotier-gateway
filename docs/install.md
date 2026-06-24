@@ -7,7 +7,7 @@
 - [整体流程](#整体流程)
 - [第 0 步：准备 ZeroTier 网络](#第-0-步准备-zerotier-网络)
 - [第 1 步：获取项目](#第-1-步获取项目)
-- [第 2 步：填写配置文件](#第-2-步填写配置文件)
+- [第 2 步：生成配置文件](#第-2-步生成配置文件)
 - [第 3 步：安装 Ubuntu 节点](#第-3-步安装-ubuntu-节点)
 - [第 4 步：配置两台 Windows](#第-4-步配置两台-windows)
 - [第 5 步：远程访问](#第-5-步远程访问)
@@ -46,10 +46,10 @@
 4. 确认网络是私有网络。
 5. 后面每台机器加入网络后，都要在这个页面勾选授权。
 
-网络编号会填到 `.env`：
+初始化脚本会问你这个网络编号：
 
 ```text
-ZEROTIER_NETWORK_ID=这里填你的网络编号
+ZeroTier 网络编号，16 位: 这里输入你的网络编号
 ```
 
 ## 第 1 步：获取项目
@@ -68,24 +68,26 @@ git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd .\zerotier-gateway
 ```
 
-## 第 2 步：填写配置文件
+## 第 2 步：生成配置文件
 
-复制配置样例：
+运行初始化脚本，按提示回答问题。一路回车会使用推荐默认值。
+
+Ubuntu：
 
 ```bash
-cp config/example.env .env
+bash scripts/ubuntu/init-config.sh
 ```
 
 Windows PowerShell：
 
 ```powershell
-Copy-Item .\config\example.env .\.env
+.\scripts\windows\init-config.ps1
 ```
 
-打开 `.env`，先填最关键的几项：
+脚本会在项目根目录生成 `.env`。最关键的几项会是这样：
 
 ```text
-ZEROTIER_NETWORK_ID=你的 ZeroTier 网络编号
+ZEROTIER_NETWORK_ID=你输入的 ZeroTier 网络编号
 ZEROTIER_SUBNET=10.246.77.0/24
 UBUNTU_ZT_IP=10.246.77.1
 HOME_PC_ZT_IP=10.246.77.10
@@ -98,6 +100,8 @@ PROXY_PASSWORD=
 ```
 
 默认不需要代理用户名和密码。只有你想限制谁能使用这个代理时，才同时填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`。
+
+如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
 
 字段含义：
 

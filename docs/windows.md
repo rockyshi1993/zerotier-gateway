@@ -4,6 +4,12 @@
 
 ## 初始化
 
+第一次使用前，先生成配置：
+
+```powershell
+.\scripts\windows\init-config.ps1
+```
+
 家里电脑：
 
 ```powershell
