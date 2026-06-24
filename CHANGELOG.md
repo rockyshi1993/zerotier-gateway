@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 修复
+- README、安装指南和 Windows 文档补充两台以上电脑加入 ZeroTier 时的处理方式，说明额外电脑只用代理时不需要执行 `setup.ps1`，需要被远程访问时应单独放行对应 ZeroTier IP。
 - 代理配置新增可选公网入口：`PROXY_PUBLIC_ACCESS`、`PROXY_CONNECT_HOST`、`PROXY_ALLOWED_CLIENT_CIDRS`，默认仍使用 ZeroTier 私有入口；公网入口会自动设置监听地址并尝试识别服务器公网 IP，来源白名单留空表示全部来源，账号密码保持可选。
 - Ubuntu 中转脚本现在会生成可用的 systemd socket/service，使用 `systemd-socket-proxyd` 把 Ubuntu ZeroTier 入口转发到家里和公司 Windows 远程端口，不再只输出“需要自行安装 relay”的提示。
 - README、安装指南和中转文档补充中转验证流程，写清 Ubuntu 监听、Windows 到 Ubuntu、Ubuntu 到目标 Windows 远程端口的分段检查方式。

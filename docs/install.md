@@ -232,6 +232,37 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 只加入 ZeroTier 网络、并且不需要被远程访问的电脑，可以不执行 `setup.ps1`；需要被另一台电脑远程访问，或需要本项目帮你检查网络和生成代理规则的 Windows，建议执行。
 
+### 超过两台 Windows 怎么办
+
+ZeroTier 网络可以加入更多电脑。本项目默认只内置两台重点远程电脑：
+
+| 角色 | 默认 IP |
+|---|---|
+| 家里电脑 | `10.246.77.10` |
+| 公司电脑 | `10.246.77.20` |
+
+第三台、第四台电脑可以固定为 `10.246.77.30`、`10.246.77.31` 这类地址。不要和 Ubuntu 的 `10.246.77.1`、家里电脑、公司电脑、自动分配池冲突。
+
+处理方式：
+
+| 用途 | 做法 |
+|---|---|
+| 只用 Ubuntu 代理 | 加入 ZeroTier 并授权，软件代理填 `10.246.77.1:10808` |
+| 只远程访问别人 | 加入 ZeroTier 并授权，远程工具填目标电脑的 ZeroTier IP |
+| 也要被远程访问 | 给这台电脑固定 IP，并在这台电脑防火墙里放行允许访问它的对端 IP |
+
+如果你已经启用了代理公网入口，额外电脑的软件代理地址按 `.env` 里的 `PROXY_CONNECT_HOST:10808` 填，不再填 `10.246.77.1:10808`。
+
+`setup.ps1 -Role Home` 和 `setup.ps1 -Role Work` 只适合默认两台重点远程电脑。额外电脑不要随便选一个角色执行，否则防火墙规则会和实际身份不一致。
+
+额外电脑需要被访问时，用管理员 PowerShell 手动加规则。下面例子表示：第三台电脑只允许公司电脑 `10.246.77.20` 访问它的 `3389`：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.20 -Profile Any
+```
+
+如果你信任整个 ZeroTier 私有网络，可以把 `-RemoteAddress` 改成 `10.246.77.0/24`。不要把远程端口放行到公网。
+
 家里电脑：
 
 ```powershell

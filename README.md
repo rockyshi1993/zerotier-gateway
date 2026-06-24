@@ -11,6 +11,7 @@
 | 配置 Ubuntu 代理节点 | [3. 配置 Ubuntu 节点](#3-配置-ubuntu-节点) |
 | 检查 ZeroTier Central 网段和地址池 | [ZeroTier Central 网段和地址池检查](#zerotier-central-网段和地址池检查) |
 | 配置家里和公司 Windows | [4. 配置两台 Windows](#4-配置两台-windows)、[打开管理员 PowerShell](#打开管理员-powershell)、[执行 Windows 脚本](#执行-windows-脚本) |
+| 有更多电脑加入 ZeroTier | [超过两台 Windows 怎么办](#超过两台-windows-怎么办) |
 | 写入或修复 Windows 防火墙 | [写入防火墙规则](#写入防火墙规则)、[防火墙写入失败](#防火墙写入失败) |
 | 开始远程访问 | [5. 远程访问](#5-远程访问) |
 | 开启 TUN 或全局代理后远程不通 | [TUN 或全局代理开启后远程不通](#tun-或全局代理开启后远程不通) |
@@ -40,6 +41,8 @@
 | 公司 Windows 电脑 | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
 远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置代理，不改整台电脑的全局网络。默认代理入口是 `10.246.77.1:10808`；如果这个入口测速慢，可以按后文开启可选公网入口，让客户端直接连 Ubuntu 服务器公网 IP。
+
+上表是最小推荐结构。ZeroTier 网络里可以加入更多电脑，只要每台电脑有不同的 `10.246.77.x` 地址即可；本项目脚本默认只把“家里电脑”和“公司电脑”作为两台重点远程电脑来管理。
 
 ## 开始前准备
 
@@ -175,6 +178,35 @@ sudo bash scripts/ubuntu/health-check.sh
 两台 Windows 都已经加入同一个 ZeroTier 网络后，还需要分别在本机执行一次 Windows 脚本。脚本会读取 `.env`，告诉你这台电脑应该放行哪一个对端 ZeroTier IP。
 
 只加入 ZeroTier 网络、并且不需要被远程访问的电脑，可以不执行 `setup.ps1`；需要被另一台电脑远程访问，或需要本项目帮你检查网络和生成代理规则的 Windows，建议执行。
+
+#### 超过两台 Windows 怎么办
+
+可以加入更多电脑，但要按用途处理：
+
+| 用途 | 怎么做 |
+|---|---|
+| 只使用代理上网 | 加入 ZeroTier 并授权即可；软件代理填 `10.246.77.1:10808`，不需要执行 `setup.ps1` |
+| 只访问其他电脑 | 加入 ZeroTier 并授权即可；远程工具填目标电脑的 ZeroTier IP |
+| 也要被别人远程访问 | 给这台电脑固定一个新的 `10.246.77.x`，并在这台电脑防火墙里放行允许访问它的对端 IP |
+
+如果你已经启用了代理公网入口，额外电脑的软件代理地址按 `.env` 里的 `PROXY_CONNECT_HOST:10808` 填，不再填 `10.246.77.1:10808`。
+
+推荐把额外电脑固定到 `10.246.77.30`、`10.246.77.31` 这类地址，避开：
+
+```text
+10.246.77.1   Ubuntu 节点
+10.246.77.10  家里电脑
+10.246.77.20  公司电脑
+10.246.77.100-254  可选自动分配池
+```
+
+`setup.ps1 -Role Home` 和 `setup.ps1 -Role Work` 只管理默认两台重点远程电脑，不要在第三台电脑上随便选择 Home 或 Work。第三台电脑如果需要被远程访问，可以用管理员 PowerShell 手动加规则。下面例子表示：第三台电脑自己的 ZeroTier IP 是 `10.246.77.30`，只允许公司电脑 `10.246.77.20` 访问它的远程端口 `3389`：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.20 -Profile Any
+```
+
+如果你信任整个 ZeroTier 私有网络，也可以把 `-RemoteAddress` 改成 `10.246.77.0/24`。不要把远程端口放行到公网。
 
 #### 打开管理员 PowerShell
 

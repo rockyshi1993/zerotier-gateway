@@ -53,6 +53,27 @@ cd E:\Worker\zerotier-gateway
 
 `-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。如果某台 Windows 只加入 ZeroTier 网络，但不需要被另一台电脑远程访问，也不需要本项目生成规则，可以不执行 `setup.ps1`。
 
+## 更多 Windows 电脑
+
+ZeroTier 网络可以加入两台以上 Windows。默认脚本只内置两个角色：
+
+| 角色 | 默认 IP |
+|---|---|
+| Home | `10.246.77.10` |
+| Work | `10.246.77.20` |
+
+额外电脑可以固定为 `10.246.77.30`、`10.246.77.31` 等地址。只使用代理或只访问别人的电脑，不需要执行 `setup.ps1`。
+
+如果你已经启用了代理公网入口，额外电脑的软件代理地址按 `.env` 里的 `PROXY_CONNECT_HOST:10808` 填，不再填 `10.246.77.1:10808`。
+
+如果额外电脑也要被远程访问，请在那台电脑上用管理员 PowerShell 手动放行允许访问它的对端 ZeroTier IP。例如只允许公司电脑访问第三台电脑的 `3389`：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.20 -Profile Any
+```
+
+如果信任整个 ZeroTier 私有网络，可以把 `-RemoteAddress` 改成 `10.246.77.0/24`。不要把远程端口放行到公网。
+
 家里电脑：
 
 ```powershell
