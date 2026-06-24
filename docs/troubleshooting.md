@@ -40,6 +40,21 @@ Windows：
 3. 代理监听在 `10.246.77.1:10808`。
 4. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
 
+如果 Ubuntu 上看到：
+
+```text
+Proxy port 10808 is not listening
+Unit sing-box-zt-proxy.service could not be found.
+```
+
+说明代理服务没有装上。普通用户先重新执行主安装命令：
+
+```bash
+sudo bash scripts/ubuntu/install.sh
+```
+
+`scripts/ubuntu/install-proxy.sh` 是单独修代理时用的子脚本；主流程不需要直接运行它。
+
 运行：
 
 ```powershell

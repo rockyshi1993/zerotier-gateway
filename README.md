@@ -104,6 +104,8 @@ sudo bash scripts/ubuntu/install.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
+`install.sh` 会同时安装 ZeroTier 和代理服务。普通安装只需要跑这一条；如果 `health-check.sh` 提示 `sing-box-zt-proxy.service could not be found`，说明代理服务没有装上，先重新执行 `sudo bash scripts/ubuntu/install.sh`。
+
 然后到 ZeroTier Central：
 
 1. 找到刚加入网络的 Ubuntu 节点。

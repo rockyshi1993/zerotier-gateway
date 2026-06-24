@@ -15,6 +15,8 @@ sudo bash scripts/ubuntu/install.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
+`install.sh` 会同时安装 ZeroTier 和代理服务。`scripts/ubuntu/install-proxy.sh` 是单独修代理时用的子脚本，普通安装不用直接运行。
+
 ## 代理监听
 
 代理必须监听 Ubuntu 的 ZeroTier IP：
