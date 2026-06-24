@@ -22,7 +22,12 @@ Usage:
 }
 
 $config = Read-ZtgEnv -Path $Env
-$endpoint = "$($config['UBUNTU_ZT_IP']):$($config['PROXY_PORT'])"
+$proxyHost = if ($config.Contains('PROXY_CONNECT_HOST') -and -not [string]::IsNullOrWhiteSpace([string]$config['PROXY_CONNECT_HOST'])) {
+  [string]$config['PROXY_CONNECT_HOST']
+} else {
+  [string]$config['UBUNTU_ZT_IP']
+}
+$endpoint = "${proxyHost}:$($config['PROXY_PORT'])"
 Write-ZtgInfo "Testing proxy endpoint $endpoint"
-Test-NetConnection -ComputerName $config['UBUNTU_ZT_IP'] -Port ([int]$config['PROXY_PORT']) | Format-List | Out-String | Write-Host
+Test-NetConnection -ComputerName $proxyHost -Port ([int]$config['PROXY_PORT']) | Format-List | Out-String | Write-Host
 Write-ZtgInfo "Optional exit IP test URL: $Url"

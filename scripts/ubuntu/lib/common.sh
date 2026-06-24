@@ -35,6 +35,13 @@ ztg_run() {
   "$@"
 }
 
+ztg_is_true() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 ztg_ensure_artifacts() {
   mkdir -p "$ZTG_ARTIFACTS_DIR"
 }

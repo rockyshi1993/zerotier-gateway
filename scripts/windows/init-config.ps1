@@ -136,6 +136,28 @@ $homeIp = Read-ConfigValue -Label 'Home Windows ZeroTier IP' -Default (Get-Confi
 $workIp = Read-ConfigValue -Label 'Work Windows ZeroTier IP' -Default (Get-ConfigValue -Map $current -Key 'WORK_PC_ZT_IP' -Default '10.246.77.20') -Required
 $proxyPort = Read-ConfigValue -Label 'Proxy port' -Default (Get-ConfigValue -Map $current -Key 'PROXY_PORT' -Default '10808') -Required
 
+$publicDefault = (Get-ConfigValue -Map $current -Key 'PROXY_PUBLIC_ACCESS' -Default 'false') -eq 'true'
+$proxyPublicAccess = 'false'
+$proxyBindIp = $ubuntuIp
+$proxyConnectHost = $ubuntuIp
+$proxyAllowedClientCidrs = ''
+
+if (Read-YesNo -Label 'Enable public proxy entry for better speed' -Default $publicDefault) {
+  $publicBindDefault = Get-ConfigValue -Map $current -Key 'PROXY_BIND_IP' -Default '0.0.0.0'
+  $publicConnectDefault = Get-ConfigValue -Map $current -Key 'PROXY_CONNECT_HOST' -Default ''
+  if (-not $publicDefault) {
+    $publicBindDefault = '0.0.0.0'
+    $publicConnectDefault = ''
+  }
+  $proxyPublicAccess = 'true'
+  $proxyBindIp = Read-ConfigValue -Label 'Proxy listen address, usually 0.0.0.0 or the server public interface IP' -Default $publicBindDefault -Required
+  $proxyConnectHost = Read-ConfigValue -Label 'Client proxy host, use the server public IP for public entry' -Default $publicConnectDefault -Required
+  $proxyAllowedClientCidrs = Read-ConfigValue -Label 'Allowed public client IP/CIDR list, comma separated, can be empty for now' -Default (Get-ConfigValue -Map $current -Key 'PROXY_ALLOWED_CLIENT_CIDRS' -Default '')
+  if ([string]::IsNullOrWhiteSpace($proxyAllowedClientCidrs)) {
+    Write-ZtgWarn 'No public client whitelist was entered. The Ubuntu script will not add a broad public allow rule.'
+  }
+}
+
 $proxyUsername = Get-ConfigValue -Map $current -Key 'PROXY_USERNAME' -Default ''
 $proxyPassword = Get-ConfigValue -Map $current -Key 'PROXY_PASSWORD' -Default ''
 $authDefault = -not [string]::IsNullOrWhiteSpace($proxyUsername) -and -not [string]::IsNullOrWhiteSpace($proxyPassword)
@@ -158,7 +180,10 @@ UBUNTU_ZT_IP=$ubuntuIp
 HOME_PC_ZT_IP=$homeIp
 WORK_PC_ZT_IP=$workIp
 
-PROXY_BIND_IP=$ubuntuIp
+PROXY_BIND_IP=$proxyBindIp
+PROXY_PUBLIC_ACCESS=$proxyPublicAccess
+PROXY_CONNECT_HOST=$proxyConnectHost
+PROXY_ALLOWED_CLIENT_CIDRS=$proxyAllowedClientCidrs
 PROXY_PORT=$proxyPort
 PROXY_USERNAME=$proxyUsername
 PROXY_PASSWORD=$proxyPassword

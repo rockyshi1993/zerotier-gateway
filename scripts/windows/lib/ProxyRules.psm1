@@ -86,8 +86,14 @@ function New-ZtgPacContent {
   if (-not $suffixJson) { $suffixJson = '[]' }
   if (-not $netsJson) { $netsJson = '[]' }
 
+  $proxyHost = if ($Config.Contains('PROXY_CONNECT_HOST') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_CONNECT_HOST'])) {
+    [string]$Config['PROXY_CONNECT_HOST']
+  } else {
+    [string]$Config['UBUNTU_ZT_IP']
+  }
+
   $template = Get-Content -Raw -LiteralPath (Join-Path (Get-ZtgProjectRoot) 'templates/pac/proxy.pac.tmpl')
-  $template = $template.Replace('${PROXY_HOST}', [string]$Config['UBUNTU_ZT_IP'])
+  $template = $template.Replace('${PROXY_HOST}', $proxyHost)
   $template = $template.Replace('${PROXY_PORT}', [string]$Config['PROXY_PORT'])
   $template = $template.Replace('${DIRECT_HOSTS_JSON}', $hostsJson)
   $template = $template.Replace('${DIRECT_SUFFIXES_JSON}', $suffixJson)
@@ -136,9 +142,15 @@ function New-ZtgClientRulesContent {
     $authJson = ",`n      `"username`": $usernameJson,`n      `"password`": $passwordJson"
   }
 
+  $proxyHost = if ($Config.Contains('PROXY_CONNECT_HOST') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_CONNECT_HOST'])) {
+    [string]$Config['PROXY_CONNECT_HOST']
+  } else {
+    [string]$Config['UBUNTU_ZT_IP']
+  }
+
   $template = Get-Content -Raw -LiteralPath (Join-Path (Get-ZtgProjectRoot) 'templates/sing-box/windows-local-client.json.tmpl')
   $template = $template.Replace('${LOCAL_PROXY_PORT}', [string]$Config['LOCAL_PROXY_PORT'])
-  $template = $template.Replace('${UBUNTU_ZT_IP}', [string]$Config['UBUNTU_ZT_IP'])
+  $template = $template.Replace('${PROXY_CONNECT_HOST}', $proxyHost)
   $template = $template.Replace('${PROXY_PORT}', [string]$Config['PROXY_PORT'])
   $template = $template.Replace('${CLIENT_PROXY_AUTH_JSON}', $authJson)
   $template = $template.Replace('${ROUTE_RULES_JSON}', $rulesJson)

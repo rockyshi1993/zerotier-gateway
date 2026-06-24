@@ -12,6 +12,7 @@
 - [第 4 步：配置两台 Windows](#第-4-步配置两台-windows)
 - [第 5 步：远程访问](#第-5-步远程访问)
 - [第 6 步：代理上网](#第-6-步代理上网)
+- [代理公网入口提速](#代理公网入口提速)
 - [第 7 步：排除规则](#第-7-步排除规则)
 - [第 8 步：中转兜底](#第-8-步中转兜底)
 - [验收清单](#验收清单)
@@ -94,6 +95,9 @@ HOME_PC_ZT_IP=10.246.77.10
 WORK_PC_ZT_IP=10.246.77.20
 
 PROXY_BIND_IP=10.246.77.1
+PROXY_PUBLIC_ACCESS=false
+PROXY_CONNECT_HOST=10.246.77.1
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_PORT=10808
 PROXY_USERNAME=
 PROXY_PASSWORD=
@@ -111,7 +115,10 @@ PROXY_PASSWORD=
 | `UBUNTU_ZT_IP` | Ubuntu 节点固定 IP，推荐 `10.246.77.1` |
 | `HOME_PC_ZT_IP` | 家里电脑固定 IP，推荐 `10.246.77.10` |
 | `WORK_PC_ZT_IP` | 公司电脑固定 IP，推荐 `10.246.77.20` |
-| `PROXY_BIND_IP` | 代理监听地址，通常和 Ubuntu 节点 IP 一样 |
+| `PROXY_BIND_IP` | 代理监听地址；默认填 Ubuntu ZeroTier IP，开启公网入口时可填 `0.0.0.0` |
+| `PROXY_PUBLIC_ACCESS` | 是否启用代理公网入口；默认 `false` |
+| `PROXY_CONNECT_HOST` | 客户端连接代理时使用的地址；默认 `10.246.77.1`，公网入口填服务器公网 IP |
+| `PROXY_ALLOWED_CLIENT_CIDRS` | 允许访问公网代理的来源公网 IP/CIDR，多个用英文逗号分隔 |
 | `PROXY_PORT` | 代理端口，默认 `10808` |
 | `PROXY_USERNAME` | 可选代理用户名；留空表示不启用认证 |
 | `PROXY_PASSWORD` | 可选代理密码；留空表示不启用认证 |
@@ -187,8 +194,8 @@ sudo bash scripts/ubuntu/health-check.sh
 
 - Ubuntu 节点在 ZeroTier Central 显示在线。
 - Ubuntu 节点 IP 是 `10.246.77.1`。
-- 代理监听在 `10.246.77.1:10808`。
-- 防火墙没有把 `10808` 暴露到公网。
+- 默认代理监听在 `10.246.77.1:10808`。
+- 如果启用了代理公网入口，代理可以监听 `0.0.0.0:10808`，但云防火墙或系统防火墙必须限制来源 IP。
 
 如果 `health-check.sh` 提示 `sing-box-zt-proxy.service could not be found`，说明代理服务没有装上，先重新执行：
 
@@ -357,6 +364,66 @@ zerotier-cli peers
 
 只在需要代理的软件里填这个代理。没有配置代理的软件继续走原网络。
 
+### 代理公网入口提速
+
+默认入口 `10.246.77.1:10808` 会走 ZeroTier 私有网络。如果你测试发现这个入口慢，但同一台服务器上的 Outline、v2rayN 或其他公网代理入口明显更快，可以把本仓库代理也改成“服务器公网 IP 入口”。
+
+重新运行 Ubuntu 初始化脚本：
+
+```bash
+cd ~/zerotier-gateway
+bash scripts/ubuntu/init-config.sh
+```
+
+走到“是否启用代理公网入口提速”时选择启用，推荐填写：
+
+```text
+代理监听地址：0.0.0.0
+客户端连接代理地址：Ubuntu 服务器公网 IP
+允许访问公网代理的公网 IP/CIDR：公司公网IP/32,家里公网IP/32
+```
+
+生成后的关键配置：
+
+```text
+PROXY_BIND_IP=0.0.0.0
+PROXY_PUBLIC_ACCESS=true
+PROXY_CONNECT_HOST=Ubuntu服务器公网IP
+PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_PORT=10808
+```
+
+代理账号密码仍然是可选项。不开启账号密码也可以，但公网入口必须用云防火墙或系统防火墙限制来源 IP；不要把 `10808` 对全网开放。
+
+让 Ubuntu 代理重新生效：
+
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
+sudo bash scripts/ubuntu/health-check.sh
+```
+
+Windows 侧测试和重新生成规则：
+
+如果 Windows 仓库里也有 `.env`，先同步这些字段，或在 Windows 重新运行 `.\scripts\windows\init-config.ps1` 输入同一套值：
+
+```text
+PROXY_PUBLIC_ACCESS
+PROXY_CONNECT_HOST
+PROXY_ALLOWED_CLIENT_CIDRS
+PROXY_PORT
+PROXY_USERNAME
+PROXY_PASSWORD
+```
+
+```powershell
+.\scripts\windows\test-proxy.ps1
+.\scripts\windows\generate-proxy-pac.ps1
+.\scripts\windows\generate-client-rules.ps1
+```
+
+公网入口开启后，手动代理软件里填写 `PROXY_CONNECT_HOST:10808`，不再填写 `10.246.77.1:10808`。远程访问不受这个设置影响，仍然优先走对方 Windows 的 ZeroTier IP。
+
 ### 后续启用或修改代理账号密码
 
 可以后续重新配置，不需要重新加入 ZeroTier，也不需要从头安装整套网络。代理服务跑在 Ubuntu 节点上，所以最终以 Ubuntu 节点项目根目录里的 `.env` 为准。
@@ -397,7 +464,8 @@ sudo bash scripts/ubuntu/health-check.sh
 
 成功标准：
 
-- 需要代理的软件能通过 `10.246.77.1:10808` 访问网络。
+- 默认私有入口时，需要代理的软件能通过 `10.246.77.1:10808` 访问网络。
+- 启用公网入口时，需要代理的软件能通过 `PROXY_CONNECT_HOST:10808` 访问网络。
 - 不需要代理的软件不受影响。
 - `test-proxy.ps1` 能连通代理入口。
 
@@ -553,7 +621,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 | 公司电脑 IP | `10.246.77.20` |
 | ZeroTier 地址 | `zerotier-cli listnetworks` 里没有残留 `172.27.x.x` |
 | 远程访问 | 两台 Windows 能用对方 ZeroTier IP 远程 |
-| 代理入口 | `10.246.77.1:10808` 可用 |
+| 代理入口 | 默认 `10.246.77.1:10808` 可用；启用公网入口时 `PROXY_CONNECT_HOST:10808` 可用 |
 | 代理范围 | 只有配置了代理的软件走 Ubuntu |
 | 排除规则 | PAC 或本地客户端规则重新生成并导入 |
 | 中转 | 只有直连差时才启用 |
@@ -564,7 +632,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 |---|---|
 | 三台机器互相 ping 不通 | ZeroTier 是否授权、IP 是否固定、是否在同一网络 |
 | 远程工具连不上 | 是否填了对方 ZeroTier IP；Windows 防火墙是否允许远程端口 |
-| 代理连不上 | Ubuntu 是否在线；`health-check.sh` 是否看到 `10.246.77.1:10808` |
+| 代理连不上 | Ubuntu 是否在线；`health-check.sh` 是否看到监听端口；公网入口时 `PROXY_CONNECT_HOST`、云防火墙、`PROXY_ALLOWED_CLIENT_CIDRS` 是否正确 |
 | 代理认证失败 | 如果启用了认证，检查 `.env` 里的用户名密码是否和软件里填写一致；如果没启用认证，软件里不要填用户名密码 |
 | 排除规则不生效 | 是否重新生成 PAC 或本地客户端规则；多进程软件是否只填了主进程 |
 | 直连延迟高 | 先检查 ZeroTier Central 是否只保留 `10.246.77.0/24`，TUN 或全局代理是否让 `10.246.77.0/24` 和 ZeroTier 进程直连，再考虑中转 |

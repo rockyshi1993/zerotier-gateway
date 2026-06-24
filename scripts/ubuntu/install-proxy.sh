@@ -24,3 +24,4 @@ ztg_run install -d -m 0755 /etc/zerotier-gateway
 ztg_run cp "$ZTG_ARTIFACTS_DIR/sing-box-server.json" /etc/zerotier-gateway/sing-box-server.json
 ztg_run systemctl restart sing-box-zt-proxy.service
 ztg_log_info "Proxy should listen on ${PROXY_BIND_IP}:${PROXY_PORT}."
+ztg_log_info "Client proxy entry should use ${PROXY_CONNECT_HOST}:${PROXY_PORT}."

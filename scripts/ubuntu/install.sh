@@ -13,7 +13,8 @@ ztg_validate_all
 ztg_log_step "ZeroTier Gateway install plan"
 ztg_log_info "Config: $ZTG_ENV_FILE"
 ztg_log_info "Network: $ZEROTIER_NETWORK_ID ($ZEROTIER_SUBNET)"
-ztg_log_info "Proxy: ${PROXY_BIND_IP}:${PROXY_PORT}"
+ztg_log_info "Proxy listens on: ${PROXY_BIND_IP}:${PROXY_PORT}"
+ztg_log_info "Client proxy entry: ${PROXY_CONNECT_HOST}:${PROXY_PORT}"
 
 if [ "$ZTG_DRY_RUN" = "true" ]; then
   ztg_log_info "Dry-run complete. No system changes were made."

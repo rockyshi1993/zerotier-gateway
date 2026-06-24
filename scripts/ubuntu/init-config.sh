@@ -163,6 +163,36 @@ home_ip="$(prompt_value "家里 Windows ZeroTier IP" "$(current_or_default HOME_
 work_ip="$(prompt_value "公司 Windows ZeroTier IP" "$(current_or_default WORK_PC_ZT_IP "10.246.77.20")" true)"
 proxy_port="$(prompt_value "代理端口" "$(current_or_default PROXY_PORT "10808")" true)"
 
+public_default="false"
+if [ "$(current_or_default PROXY_PUBLIC_ACCESS "false")" = "true" ]; then
+  public_default="true"
+fi
+
+proxy_public_access="false"
+proxy_bind_ip="$ubuntu_ip"
+proxy_connect_host="$ubuntu_ip"
+proxy_allowed_client_cidrs=""
+
+if prompt_yes_no "是否启用代理公网入口提速" "$public_default"; then
+  public_bind_default="$(current_or_default PROXY_BIND_IP "0.0.0.0")"
+  public_connect_default="$(current_or_default PROXY_CONNECT_HOST "")"
+  if [ "$public_default" != "true" ]; then
+    public_bind_default="0.0.0.0"
+    public_connect_default=""
+  fi
+  proxy_public_access="true"
+  proxy_bind_ip="$(prompt_value "代理监听地址，公网入口通常填 0.0.0.0 或服务器公网网卡 IP" "$public_bind_default" true)"
+  proxy_connect_host="$(prompt_value "客户端连接代理地址，公网入口必须填服务器公网 IP" "$public_connect_default" true)"
+  proxy_allowed_client_cidrs="$(prompt_value "允许访问公网代理的公网 IP/CIDR，多个用英文逗号分隔，可先留空" "$(current_or_default PROXY_ALLOWED_CLIENT_CIDRS "")" false)"
+  if [ -z "$proxy_allowed_client_cidrs" ]; then
+    echo "[WARN] 未填写公网访问白名单。脚本不会添加公网放行规则，请先在云防火墙或系统防火墙限制来源 IP。"
+  fi
+else
+  proxy_bind_ip="$ubuntu_ip"
+  proxy_connect_host="$ubuntu_ip"
+  proxy_allowed_client_cidrs=""
+fi
+
 proxy_username="$(current_or_default PROXY_USERNAME "")"
 proxy_password="$(current_or_default PROXY_PASSWORD "")"
 auth_default="false"
@@ -190,7 +220,10 @@ UBUNTU_ZT_IP=$ubuntu_ip
 HOME_PC_ZT_IP=$home_ip
 WORK_PC_ZT_IP=$work_ip
 
-PROXY_BIND_IP=$ubuntu_ip
+PROXY_BIND_IP=$proxy_bind_ip
+PROXY_PUBLIC_ACCESS=$proxy_public_access
+PROXY_CONNECT_HOST=$proxy_connect_host
+PROXY_ALLOWED_CLIENT_CIDRS=$proxy_allowed_client_cidrs
 PROXY_PORT=$proxy_port
 PROXY_USERNAME=$proxy_username
 PROXY_PASSWORD=$proxy_password

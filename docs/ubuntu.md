@@ -21,14 +21,28 @@ sudo bash scripts/ubuntu/health-check.sh
 
 ## 代理监听
 
-代理必须监听 Ubuntu 的 ZeroTier IP：
+默认情况下，代理监听 Ubuntu 的 ZeroTier IP：
 
 ```text
 PROXY_BIND_IP=10.246.77.1
+PROXY_PUBLIC_ACCESS=false
+PROXY_CONNECT_HOST=10.246.77.1
 PROXY_PORT=10808
 ```
 
-不要把代理监听地址改成 `0.0.0.0`。
+这时客户端代理入口是 `10.246.77.1:10808`，只供 ZeroTier 私有网络内访问。
+
+如果代理测速慢，而服务器公网 IP 入口更快，可以显式开启公网入口：
+
+```text
+PROXY_BIND_IP=0.0.0.0
+PROXY_PUBLIC_ACCESS=true
+PROXY_CONNECT_HOST=Ubuntu服务器公网IP
+PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_PORT=10808
+```
+
+开启公网入口后，客户端代理入口改为 `PROXY_CONNECT_HOST:10808`。账号密码仍然可选，但必须用云防火墙或 Ubuntu 防火墙限制来源 IP，不要把 `10808` 对全网开放。
 
 ## 系统服务
 

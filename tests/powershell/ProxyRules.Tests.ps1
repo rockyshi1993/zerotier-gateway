@@ -27,6 +27,20 @@ if ($client -notmatch '"process_name":\["steam\.exe","mstsc\.exe","msrdc\.exe"\]
 }
 $client | ConvertFrom-Json | Out-Null
 
+$publicConfig = [ordered]@{}
+foreach ($key in $config.Keys) {
+  $publicConfig[$key] = $config[$key]
+}
+$publicConfig['PROXY_CONNECT_HOST'] = '203.0.113.10'
+$publicPac = New-ZtgPacContent -Config $publicConfig
+if ($publicPac -notmatch '203\.0\.113\.10:10808') {
+  throw 'PAC content should use PROXY_CONNECT_HOST when it is set.'
+}
+$publicClient = New-ZtgClientRulesContent -Config $publicConfig
+if ($publicClient -notmatch '"server":\s*"203\.0\.113\.10"') {
+  throw 'Client rules should use PROXY_CONNECT_HOST when it is set.'
+}
+
 $noAuthConfig = [ordered]@{}
 foreach ($key in $config.Keys) {
   $noAuthConfig[$key] = $config[$key]

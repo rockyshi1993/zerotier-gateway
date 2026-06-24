@@ -151,9 +151,12 @@ zerotier-cli peers
 
 1. Ubuntu 节点已经拿到 `10.246.77.1`。
 2. sing-box 服务正在运行。
-3. 代理监听在 `10.246.77.1:10808`。
-4. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
-5. 如果刚修改过代理账号密码，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件或本地规则也已经同步成同一套账号密码。
+3. 默认私有入口时，代理监听在 `10.246.77.1:10808`。
+4. 如果启用了公网入口，`PROXY_PUBLIC_ACCESS=true`，并且 `PROXY_CONNECT_HOST` 是 Ubuntu 服务器公网 IP。
+5. 如果启用了公网入口，云防火墙和 Ubuntu 防火墙允许你的来源公网 IP 访问 `10808/tcp`。
+6. 如果启用了公网入口，`PROXY_ALLOWED_CLIENT_CIDRS` 已填写公司或家里的公网 IP/CIDR；没有白名单时脚本不会添加宽泛公网放行规则。
+7. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
+8. 如果刚修改过代理账号密码、代理入口或白名单，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件、PAC 或本地规则也已经同步。
 
 如果 Ubuntu 上看到：
 
@@ -187,6 +190,24 @@ sudo bash scripts/ubuntu/install.sh
 
 ```powershell
 .\scripts\windows\test-proxy.ps1
+```
+
+`test-proxy.ps1` 会连接 `.env` 里的 `PROXY_CONNECT_HOST:PROXY_PORT`。如果你已经启用公网入口，但输出里仍然测试 `10.246.77.1:10808`，说明 Windows 这边的 `.env` 还没有同步 `PROXY_CONNECT_HOST`。
+
+如果默认私有入口慢，但公网代理工具很快，按下面方式优化：
+
+```text
+PROXY_PUBLIC_ACCESS=true
+PROXY_BIND_IP=0.0.0.0
+PROXY_CONNECT_HOST=Ubuntu服务器公网IP
+PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+```
+
+然后在 Ubuntu 上执行：
+
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
 ```
 
 ## 进程排除没有命中

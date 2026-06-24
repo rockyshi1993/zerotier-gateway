@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 修复
+- 代理配置新增可选公网入口：`PROXY_PUBLIC_ACCESS`、`PROXY_CONNECT_HOST`、`PROXY_ALLOWED_CLIENT_CIDRS`，默认仍使用 ZeroTier 私有入口；账号密码保持可选，并补充公网入口白名单与验证提示。
 - Ubuntu 中转脚本现在会生成可用的 systemd socket/service，使用 `systemd-socket-proxyd` 把 Ubuntu ZeroTier 入口转发到家里和公司 Windows 远程端口，不再只输出“需要自行安装 relay”的提示。
 - README、安装指南和中转文档补充中转验证流程，写清 Ubuntu 监听、Windows 到 Ubuntu、Ubuntu 到目标 Windows 远程端口的分段检查方式。
 - Windows 防火墙规则写入现在会先检查管理员 PowerShell，`New-NetFirewallRule` 或 `Remove-NetFirewallRule` 失败时会立即停止，不再误报已应用。

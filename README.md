@@ -16,6 +16,7 @@
 | 开启 TUN 或全局代理后远程不通 | [TUN 或全局代理开启后远程不通](#tun-或全局代理开启后远程不通) |
 | 家庭宽带没有公网 IPv4 | [常见问题](#常见问题) |
 | 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
+| 代理测速慢，想走服务器公网入口 | [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
 | 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
 | 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转)、[验证中转是否成功](#验证中转是否成功) |
 | 检查是否配置成功 | [9. 最终验收](#9-最终验收) |
@@ -38,7 +39,7 @@
 | 家里 Windows 电脑 | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
 | 公司 Windows 电脑 | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
-远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置 `10.246.77.1:10808`，不改整台电脑的全局网络。
+远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置代理，不改整台电脑的全局网络。默认代理入口是 `10.246.77.1:10808`；如果这个入口测速慢，可以按后文开启可选公网入口，让客户端直接连 Ubuntu 服务器公网 IP。
 
 ## 开始前准备
 
@@ -92,11 +93,16 @@ ZEROTIER_NETWORK_ID=你输入的 ZeroTier 网络编号
 UBUNTU_ZT_IP=10.246.77.1
 HOME_PC_ZT_IP=10.246.77.10
 WORK_PC_ZT_IP=10.246.77.20
+PROXY_PUBLIC_ACCESS=false
+PROXY_CONNECT_HOST=10.246.77.1
+PROXY_ALLOWED_CLIENT_CIDRS=
 PROXY_USERNAME=
 PROXY_PASSWORD=
 ```
 
 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
+
+`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。后续如果想优化代理测速，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，但公网入口必须认真配置来源 IP 白名单。
 
 如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
 
@@ -161,7 +167,7 @@ sudo bash scripts/ubuntu/health-check.sh
 
 成功标准：
 
-- `health-check.sh` 能看到代理监听在 `10.246.77.1:10808`。
+- `health-check.sh` 能看到代理监听在 `10.246.77.1:10808`；如果你启用了公网入口，也可能看到 `0.0.0.0:10808`。
 - Ubuntu 节点在 ZeroTier Central 里显示在线。
 
 ### 4. 配置两台 Windows
@@ -321,7 +327,7 @@ zerotier-cli peers
 
 ### 6. 给需要的软件配置代理
 
-代理入口：
+默认代理入口：
 
 ```text
 地址：10.246.77.1
@@ -332,6 +338,84 @@ zerotier-cli peers
 ```
 
 如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。只在需要代理上网的软件里填这个代理；没有配置代理的软件继续走本机原网络。
+
+#### 代理上网提速：可选公网入口
+
+如果你发现 `10.246.77.1:10808` 代理测速慢，但同一台 Ubuntu 服务器上的 Outline、v2rayN 或其他公网入口很快，通常原因是：本仓库默认代理入口走 ZeroTier 私有网络，客户端到 Ubuntu 的这段链路可能绕路；Outline/v2rayN 往往是直接连服务器公网 IP。
+
+这种情况下可以开启代理公网入口。它只优化“代理上网”，不改变远程控制路径。远程控制仍然优先走两台 Windows 的 ZeroTier IP。
+
+在 Ubuntu 节点重新运行初始化脚本：
+
+```bash
+cd ~/zerotier-gateway
+bash scripts/ubuntu/init-config.sh
+```
+
+走到“是否启用代理公网入口提速”时选择启用，按下面填写：
+
+```text
+代理监听地址：0.0.0.0
+客户端连接代理地址：你的 Ubuntu 服务器公网 IP
+允许访问公网代理的公网 IP/CIDR：公司公网IP/32,家里公网IP/32
+```
+
+生成后的 `.env` 会类似这样：
+
+```text
+PROXY_BIND_IP=0.0.0.0
+PROXY_PUBLIC_ACCESS=true
+PROXY_CONNECT_HOST=服务器公网IP
+PROXY_ALLOWED_CLIENT_CIDRS=公司公网IP/32,家里公网IP/32
+PROXY_PORT=10808
+PROXY_USERNAME=
+PROXY_PASSWORD=
+```
+
+账号密码仍然可以不填；两项都留空时不启用认证。如果公网入口没有配置账号密码，至少要保证云防火墙或系统防火墙只允许你的公司、家里公网 IP 访问 `10808`，不要把代理端口对全网开放。
+
+让配置生效：
+
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
+sudo bash scripts/ubuntu/health-check.sh
+```
+
+然后在 Windows 上更新代理配置：
+
+如果 Windows 仓库里也有一份 `.env`，先把下面这些代理字段同步成 Ubuntu 节点上的值；也可以在 Windows 重新运行 `.\scripts\windows\init-config.ps1`，输入同一套代理配置：
+
+```text
+PROXY_PUBLIC_ACCESS
+PROXY_CONNECT_HOST
+PROXY_ALLOWED_CLIENT_CIDRS
+PROXY_PORT
+PROXY_USERNAME
+PROXY_PASSWORD
+```
+
+否则 `test-proxy.ps1`、PAC 和本地规则客户端仍会使用旧的 `10.246.77.1:10808`。
+
+```powershell
+.\scripts\windows\test-proxy.ps1
+.\scripts\windows\generate-proxy-pac.ps1
+.\scripts\windows\generate-client-rules.ps1
+```
+
+手动给软件填代理时，地址改成 `.env` 里的 `PROXY_CONNECT_HOST`，端口仍然是 `10808`。例如：
+
+```text
+地址：服务器公网IP
+端口：10808
+协议：HTTP 或 SOCKS5
+```
+
+如果 `test-proxy.ps1` 仍然连不上，先检查三处：
+
+1. `PROXY_CONNECT_HOST` 是服务器公网 IP，不是 `10.246.77.1`。
+2. DigitalOcean 或其他云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
+3. Ubuntu 的 `ufw` 已允许 `PROXY_ALLOWED_CLIENT_CIDRS` 访问 `10808/tcp`。
 
 #### 后续启用或修改代理账号密码
 
@@ -537,7 +621,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 - `zerotier-cli listnetworks` 里没有残留 `172.27.x.x`。
 - 家里和公司能互相访问对方的 ZeroTier IP。
 - 远程工具使用对方 ZeroTier IP 能连上。
-- 需要代理的软件使用 `10.246.77.1:10808` 能上网。
+- 需要代理的软件使用代理入口能上网：默认是 `10.246.77.1:10808`，启用公网入口后是 `PROXY_CONNECT_HOST:10808`。
 - 不需要代理的软件仍然走本机原网络。
 - 如果配置了排除规则，PAC 或本地客户端规则已经重新生成。
 
@@ -567,6 +651,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 |---|---|
 | 只想先跑通远程 | 先完成第 1 到第 5 步 |
 | 只给浏览器或某个软件代理 | 完成第 6 步 |
+| 默认代理入口慢，但服务器公网代理很快 | 看 [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
 | 排除公司内网、局域网或指定域名 | 做第 7 步里的 PAC |
 | 排除某个软件或多进程软件 | 做第 7 步里的本地规则客户端配置 |
 | 家庭宽带没有公网 IPv4 | 看 [常见问题](#常见问题) |

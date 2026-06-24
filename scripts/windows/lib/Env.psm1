@@ -32,6 +32,8 @@ function Read-ZtgEnv {
     WORK_PC_ZT_IP = '10.246.77.20'
     PROXY_PORT = '10808'
     PROXY_BIND_IP = '10.246.77.1'
+    PROXY_PUBLIC_ACCESS = 'false'
+    PROXY_ALLOWED_CLIENT_CIDRS = ''
     LOCAL_PROXY_PORT = '20808'
     REMOTE_PORTS = '3389'
     PROXY_MODE = 'manual'
@@ -41,6 +43,9 @@ function Read-ZtgEnv {
     if (-not $envMap.Contains($key) -or [string]::IsNullOrWhiteSpace([string]$envMap[$key])) {
       $envMap[$key] = $defaults[$key]
     }
+  }
+  if (-not $envMap.Contains('PROXY_CONNECT_HOST') -or [string]::IsNullOrWhiteSpace([string]$envMap['PROXY_CONNECT_HOST'])) {
+    $envMap['PROXY_CONNECT_HOST'] = $envMap['UBUNTU_ZT_IP']
   }
 
   $envMap['_CONFIG_PATH'] = $resolved
@@ -56,8 +61,10 @@ function Assert-ZtgEnv {
   if (-not ($Config['ZEROTIER_NETWORK_ID'] -match '^[0-9a-fA-F]{16}$')) {
     throw 'ZEROTIER_NETWORK_ID must be a 16-character hex value.'
   }
-  if ($Config['PROXY_BIND_IP'] -eq '0.0.0.0') {
-    throw 'PROXY_BIND_IP must not be 0.0.0.0. Use the Ubuntu ZeroTier IP.'
+  $publicAccessValue = ([string]$Config['PROXY_PUBLIC_ACCESS']).ToLowerInvariant()
+  $publicAccess = @('true', '1', 'yes', 'y', 'on') -contains $publicAccessValue
+  if ($Config['PROXY_BIND_IP'] -eq '0.0.0.0' -and -not $publicAccess) {
+    throw 'PROXY_BIND_IP=0.0.0.0 is only allowed when PROXY_PUBLIC_ACCESS=true. Default private mode should use the Ubuntu ZeroTier IP.'
   }
   $hasProxyUsername = $Config.Contains('PROXY_USERNAME') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_USERNAME'])
   $hasProxyPassword = $Config.Contains('PROXY_PASSWORD') -and -not [string]::IsNullOrWhiteSpace([string]$Config['PROXY_PASSWORD'])
@@ -66,6 +73,17 @@ function Assert-ZtgEnv {
   }
   if ($RequireProxyCredentials -and -not ($hasProxyUsername -and $hasProxyPassword)) {
     throw 'PROXY_USERNAME and PROXY_PASSWORD are required when proxy authentication is enabled.'
+  }
+  if ($publicAccess) {
+    if ([string]::IsNullOrWhiteSpace([string]$Config['PROXY_CONNECT_HOST']) -or [string]$Config['PROXY_CONNECT_HOST'] -eq [string]$Config['UBUNTU_ZT_IP']) {
+      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_CONNECT_HOST is not a server public IP. Clients may still use the slower ZeroTier entry.'
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$Config['PROXY_ALLOWED_CLIENT_CIDRS'])) {
+      Write-ZtgWarn 'PROXY_PUBLIC_ACCESS=true but PROXY_ALLOWED_CLIENT_CIDRS is empty. Configure cloud/system firewall whitelist before exposing the proxy port.'
+    }
+    if (-not ($hasProxyUsername -and $hasProxyPassword)) {
+      Write-ZtgWarn 'Proxy authentication is disabled. This is allowed, but public access should be protected by a strict firewall whitelist.'
+    }
   }
 }
 
