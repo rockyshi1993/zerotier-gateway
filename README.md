@@ -20,6 +20,7 @@
 | 代理测速慢，想走服务器公网入口 | [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
 | 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
 | 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转)、[验证中转是否成功](#验证中转是否成功) |
+| 有多台 Ubuntu 中转服务器，需要切换 | [多台中转服务器怎么切换](#多台中转服务器怎么切换) |
 | 检查是否配置成功 | [9. 最终验收](#9-最终验收) |
 | 查看常见问题、常见选择和更多文档 | [常见问题](#常见问题)、[常见选择](#常见选择)、[文档入口](#文档入口) |
 
@@ -75,7 +76,7 @@ cd .\zerotier-gateway
 
 ### 2. 生成配置
 
-运行初始化脚本，按提示输入 ZeroTier 网络编号和三台机器的 IP。一路回车会使用推荐默认值。
+运行初始化脚本，按提示输入 ZeroTier 网络编号和基础三台机器的 IP。一路回车会使用推荐默认值。
 
 Ubuntu：
 
@@ -122,7 +123,7 @@ PROXY_PASSWORD=
 | 位置 | 应该保留 |
 |---|---|
 | `Managed Routes` | `10.246.77.0/24 (LAN)` |
-| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给三台机器手动固定 IP |
+| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给基础三台机器手动固定 IP；更多设备也可以后续手动固定 |
 | `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
 
 不要把 `10.246.77.0/24` 填到 `Add Routes` 下面的 `Via` 里。`Via` 是“让某个节点转发某个网段”时才用；本项目默认只需要 `10.246.77.0/24 (LAN)`。
@@ -133,7 +134,7 @@ PROXY_PASSWORD=
 - 成员机器上的 `172.27.x.x` Managed IP。
 - 误填到地址池里的 `192.168.x.x`。
 
-三台机器最终只需要这些 ZeroTier IP：
+基础三台机器最终只需要这些 ZeroTier IP：
 
 | 设备 | Managed IP |
 |---|---|
@@ -536,6 +537,54 @@ DIRECT_PROCESS_PATH_REGEX=
 
 `RELAY_PORT=443` 表示第一个中转入口从 `443` 开始；如果 `REMOTE_PORTS` 有多个端口，脚本会继续使用后续端口。Ubuntu 只监听自己的 ZeroTier IP，不把远程端口暴露到公网。
 
+#### 多台中转服务器怎么切换
+
+可以让多台 Ubuntu 服务器加入同一个 ZeroTier 网络，每台服务器都要有不同的 ZeroTier IP。示例：
+
+| 服务器 | 用途 | ZeroTier IP |
+|---|---|---|
+| 旧服务器 | 原来的代理 / 中转 | `10.246.77.1` |
+| 新服务器 | 新增中转 | `10.246.77.2` |
+
+在新服务器上，`.env` 里的 `UBUNTU_ZT_IP` 必须填新服务器自己的 ZeroTier IP：
+
+```env
+UBUNTU_ZT_IP=10.246.77.2
+HOME_PC_ZT_IP=10.246.77.10
+WORK_PC_ZT_IP=10.246.77.20
+RELAY_PORT=443
+REMOTE_PORTS=3389
+```
+
+然后只在你要作为中转的那台 Ubuntu 上执行：
+
+```bash
+sudo bash scripts/ubuntu/install-relay.sh --dry-run
+sudo bash scripts/ubuntu/install-relay.sh
+```
+
+切换中转服务器时，Windows 通常不用安装新东西，也不用重跑 `setup.ps1`。你只需要把远程工具里的地址从旧服务器换成新服务器：
+
+| 远程方向 | 旧服务器 | 新服务器 |
+|---|---|---|
+| 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
+| 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
+
+但被中转访问的 Windows 必须允许新服务器访问远程端口。如果 Windows 防火墙已经放行可信的 `10.246.77.0/24`，通常不需要再加规则；如果只放行了对方电脑 IP 或旧服务器 IP，就要额外放行新服务器 IP：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
+```
+
+切换后先从 Windows 验证新服务器入口：
+
+```powershell
+Test-NetConnection 10.246.77.2 -Port 443
+Test-NetConnection 10.246.77.2 -Port 444
+```
+
+多台 Windows 加入 ZeroTier 没问题；但当前中转脚本默认只管理 `.env` 里的 `HOME_PC_ZT_IP` 和 `WORK_PC_ZT_IP` 两台重点远程电脑。其他电脑只用代理或只访问别人时，不需要中转配置；其他电脑也要被远程访问时，优先走它自己的 ZeroTier IP 直连，确实需要中转时再单独规划目标 IP 和中转端口。
+
 Ubuntu 上先预览：
 
 ```bash
@@ -591,7 +640,7 @@ Test-NetConnection 10.246.77.1 -Port 444
 TcpTestSucceeded : True
 ```
 
-如果这里是 `False`，说明 Windows 到 Ubuntu 中转入口不通。先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+如果这里是 `False`，说明 Windows 到 Ubuntu 中转入口不通。先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
 
 ```bash
 sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
@@ -649,7 +698,8 @@ sudo bash scripts/ubuntu/disable-relay.sh
 全部完成后，至少确认这几项：
 
 - Ubuntu、家里电脑、公司电脑都在同一个 ZeroTier 网络里，并且已授权。
-- 三台机器的 ZeroTier IP 分别是 `10.246.77.1`、`10.246.77.10`、`10.246.77.20`。
+- 基础三台机器的 ZeroTier IP 分别是 `10.246.77.1`、`10.246.77.10`、`10.246.77.20`。
+- 如果有更多服务器或电脑加入 ZeroTier，也逐台确认已授权、IP 不冲突。
 - `zerotier-cli listnetworks` 里没有残留 `172.27.x.x`。
 - 家里和公司能互相访问对方的 ZeroTier IP。
 - 远程工具使用对方 ZeroTier IP 能连上。

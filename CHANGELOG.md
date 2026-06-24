@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 修复
+- README、安装指南和中转文档补充多台 Ubuntu 中转服务器的切换流程，说明新服务器需要独立 ZeroTier IP、目标 Windows 需要放行新服务器 IP，并补充切换后的 Windows 验证命令；验收清单补充更多设备授权和 IP 冲突检查；测试覆盖第二台中转服务器的 dry-run 渲染。
 - README、安装指南和 Windows 文档补充两台以上电脑加入 ZeroTier 时的处理方式，说明额外电脑只用代理时不需要执行 `setup.ps1`，需要被远程访问时应单独放行对应 ZeroTier IP。
 - 代理配置新增可选公网入口：`PROXY_PUBLIC_ACCESS`、`PROXY_CONNECT_HOST`、`PROXY_ALLOWED_CLIENT_CIDRS`，默认仍使用 ZeroTier 私有入口；公网入口会自动设置监听地址并尝试识别服务器公网 IP，来源白名单留空表示全部来源，账号密码保持可选。
 - Ubuntu 中转脚本现在会生成可用的 systemd socket/service，使用 `systemd-socket-proxyd` 把 Ubuntu ZeroTier 入口转发到家里和公司 Windows 远程端口，不再只输出“需要自行安装 relay”的提示。

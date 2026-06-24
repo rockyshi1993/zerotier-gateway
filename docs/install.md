@@ -24,7 +24,7 @@
 
 1. 创建一个 ZeroTier 私有网络。
 2. 让 Ubuntu、家里电脑、公司电脑加入同一个 ZeroTier 网络。
-3. 固定三台机器的 ZeroTier IP。
+3. 固定基础三台机器的 ZeroTier IP；更多设备后续也要固定不冲突的 IP。
 4. 用 ZeroTier IP 跑通家里和公司的双向远程。
 5. 在 Ubuntu 上启动私有 HTTP/SOCKS5 代理。
 6. 只给需要代理的软件配置代理。
@@ -132,7 +132,7 @@ PROXY_PASSWORD=
 | 位置 | 应该保留 |
 |---|---|
 | `Managed Routes` | `10.246.77.0/24 (LAN)` |
-| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给三台机器手动固定 IP |
+| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给基础三台机器手动固定 IP；更多设备也可以后续手动固定 |
 | `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
 
 不要把 `10.246.77.0/24` 填到 `Add Routes` 下面的 `Via` 里。`Via` 是“让某个节点转发某个网段”时才用；本项目默认只需要 `10.246.77.0/24 (LAN)`。
@@ -143,7 +143,7 @@ PROXY_PASSWORD=
 - 成员机器上的 `172.27.x.x` Managed IP。
 - 误填到地址池里的 `192.168.x.x`。
 
-三台机器最终只需要这些 ZeroTier IP：
+基础三台机器最终只需要这些 ZeroTier IP：
 
 | 设备 | Managed IP |
 |---|---|
@@ -582,6 +582,49 @@ sudo bash scripts/ubuntu/install-relay.sh --dry-run
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.10:3389` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.20:3389` |
 
+### 多台中转服务器怎么切换
+
+可以把多台 Ubuntu 服务器加入同一个 ZeroTier 网络。每台服务器都要有自己的固定 ZeroTier IP，例如旧服务器是 `10.246.77.1`，新服务器是 `10.246.77.2`。
+
+在新服务器上，`.env` 里的 `UBUNTU_ZT_IP` 填新服务器自己的地址，目标 Windows 地址仍然填家里和公司电脑：
+
+```env
+UBUNTU_ZT_IP=10.246.77.2
+HOME_PC_ZT_IP=10.246.77.10
+WORK_PC_ZT_IP=10.246.77.20
+RELAY_PORT=443
+REMOTE_PORTS=3389
+```
+
+然后在新服务器上执行：
+
+```bash
+sudo bash scripts/ubuntu/install-relay.sh --dry-run
+sudo bash scripts/ubuntu/install-relay.sh
+```
+
+切换时，远程工具地址改成新服务器的 ZeroTier IP：
+
+| 远程方向 | 旧服务器 | 新服务器 |
+|---|---|---|
+| 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
+| 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
+
+Windows 不需要安装中转服务。只有“被中转访问”的目标 Windows 需要允许新服务器访问远程端口。如果已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了对方电脑 IP 或旧服务器 IP，请在目标 Windows 的管理员 PowerShell 里增加新服务器：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
+```
+
+切换后先从 Windows 验证新服务器入口：
+
+```powershell
+Test-NetConnection 10.246.77.2 -Port 443
+Test-NetConnection 10.246.77.2 -Port 444
+```
+
+当前中转脚本默认只管理 `.env` 里的 `HOME_PC_ZT_IP` 和 `WORK_PC_ZT_IP` 两台重点远程电脑。很多台 Windows 加入 ZeroTier 没问题；只用代理或只访问别人时不需要中转配置，要被远程访问时优先用它自己的 ZeroTier IP 直连，确实需要中转时再单独规划目标 IP 和中转端口。
+
 确认方向正确后安装：
 
 ```bash
@@ -610,7 +653,7 @@ Test-NetConnection 10.246.77.1 -Port 444
 
 成功时应看到 `TcpTestSucceeded : True`。
 
-如果 Windows 到 Ubuntu 端口不通，先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+如果 Windows 到 Ubuntu 端口不通，先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
 
 ```bash
 sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
@@ -646,10 +689,11 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 | 检查项 | 期望结果 |
 |---|---|
-| ZeroTier 网络 | 三台机器都已加入同一个网络并授权 |
+| ZeroTier 网络 | 基础三台机器都已加入同一个网络并授权 |
 | Ubuntu IP | `10.246.77.1` |
 | 家里电脑 IP | `10.246.77.10` |
 | 公司电脑 IP | `10.246.77.20` |
+| 更多设备 | 已授权，ZeroTier IP 不冲突 |
 | ZeroTier 地址 | `zerotier-cli listnetworks` 里没有残留 `172.27.x.x` |
 | 远程访问 | 两台 Windows 能用对方 ZeroTier IP 远程 |
 | 代理入口 | 默认 `10.246.77.1:10808` 可用；启用公网入口时 `PROXY_CONNECT_HOST:10808` 可用 |
@@ -661,7 +705,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 | 现象 | 先检查 |
 |---|---|
-| 三台机器互相 ping 不通 | ZeroTier 是否授权、IP 是否固定、是否在同一网络 |
+| 基础机器互相 ping 不通 | ZeroTier 是否授权、IP 是否固定、是否在同一网络 |
 | 远程工具连不上 | 是否填了对方 ZeroTier IP；Windows 防火墙是否允许远程端口 |
 | 代理连不上 | Ubuntu 是否在线；`health-check.sh` 是否看到监听端口；公网入口时 `PROXY_CONNECT_HOST`、云防火墙、`PROXY_ALLOWED_CLIENT_CIDRS` 是否正确 |
 | 代理认证失败 | 如果启用了认证，检查 `.env` 里的用户名密码是否和软件里填写一致；如果没启用认证，软件里不要填用户名密码 |

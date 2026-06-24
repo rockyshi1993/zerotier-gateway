@@ -17,6 +17,73 @@
 
 `RELAY_PORT` 是第一个监听端口，`REMOTE_PORTS` 是 Windows 远程端口列表。脚本会按“家里、公司”的顺序为每个远程端口分配两个连续监听端口。
 
+## 多台中转服务器
+
+可以有多台 Ubuntu 服务器加入同一个 ZeroTier 网络。每台服务器必须使用不同的 ZeroTier IP，例如：
+
+| 服务器 | ZeroTier IP |
+|---|---|
+| 旧中转服务器 | `10.246.77.1` |
+| 新中转服务器 | `10.246.77.2` |
+
+在哪台服务器上中转，就在哪台服务器的 `.env` 里把 `UBUNTU_ZT_IP` 设为它自己的 ZeroTier IP：
+
+```env
+UBUNTU_ZT_IP=10.246.77.2
+HOME_PC_ZT_IP=10.246.77.10
+WORK_PC_ZT_IP=10.246.77.20
+RELAY_PORT=443
+REMOTE_PORTS=3389
+```
+
+然后在这台服务器上安装中转：
+
+```bash
+sudo bash scripts/ubuntu/install-relay.sh --dry-run
+sudo bash scripts/ubuntu/install-relay.sh
+```
+
+切换服务器时，不需要在 Windows 上安装中转服务。把远程工具里的连接地址从旧服务器改成新服务器即可：
+
+| 远程方向 | 旧服务器 | 新服务器 |
+|---|---|---|
+| 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
+| 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
+
+目标 Windows 需要允许新服务器访问远程端口。如果 Windows 防火墙已经放行 `10.246.77.0/24`，通常不用再改；如果只放行了某一台电脑或旧服务器，请增加新服务器的 ZeroTier IP：
+
+```powershell
+New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
+```
+
+切换后先从 Windows 验证新服务器入口：
+
+```powershell
+Test-NetConnection 10.246.77.2 -Port 443
+Test-NetConnection 10.246.77.2 -Port 444
+```
+
+不用的旧中转可以停用：
+
+```bash
+sudo bash scripts/ubuntu/disable-relay.sh
+```
+
+停用旧服务器不会影响新服务器，也不会影响 ZeroTier 本身。
+
+## 很多台 Windows 电脑
+
+很多台 Windows 可以加入同一个 ZeroTier 网络。只用代理或只访问其他电脑时，不需要执行 `setup.ps1`，也不需要中转配置。
+
+当前中转脚本默认只为两台重点远程电脑生成入口：
+
+| 配置项 | 含义 |
+|---|---|
+| `HOME_PC_ZT_IP` | 家里电脑 |
+| `WORK_PC_ZT_IP` | 公司电脑 |
+
+其他 Windows 如果也要被远程访问，优先使用它自己的 ZeroTier IP 直连；如果确实要经过中转，需要单独规划目标 IP 和中转端口，避免多个目标共用同一个入口端口。
+
 先预览：
 
 ```bash
@@ -71,7 +138,7 @@ sudo apt-get update
 sudo apt-get install -y netcat-openbsd
 ```
 
-如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认三台机器都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
 
 ```bash
 sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home

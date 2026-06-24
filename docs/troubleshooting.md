@@ -75,12 +75,14 @@ cd E:\Worker\zerotier-gateway
 
 如果是第三台或更多 Windows 加入 ZeroTier，`setup.ps1 -Role Home/Work` 不会自动管理这些额外电脑。额外电脑只用代理或只访问别人时不需要执行 `setup.ps1`；如果它也要被远程访问，请在额外电脑上手动放行允许访问它的对端 ZeroTier IP，或放行可信的 `10.246.77.0/24`。
 
+如果你新增了另一台 Ubuntu 中转服务器，Windows 不需要安装中转服务；但目标 Windows 必须允许新服务器的 ZeroTier IP 访问远程端口。比如新服务器是 `10.246.77.2`，目标 Windows 只放行过旧服务器或对方电脑 IP，就需要额外放行 `10.246.77.2`。如果已经放行可信的 `10.246.77.0/24`，通常不用再加规则。
+
 ## ZeroTier 无法连通
 
 检查：
 
 1. 设备已经在 ZeroTier Central 授权。
-2. 三台机器的 ZeroTier IP 已按预期固定。
+2. 基础三台机器的 ZeroTier IP 已按预期固定；更多设备也已固定为不冲突的 IP。
 3. Windows 防火墙允许对端 ZeroTier IP 访问远程端口。
 4. `10.246.77.0/24` 的路由走 ZeroTier。
 5. ZeroTier Central 里没有残留 `172.27.x.x` 地址池或成员 IP。
@@ -103,7 +105,7 @@ cd E:\Worker\zerotier-gateway
 
 不要把 `10.246.77.0/24` 填到 `Via`。如果还有 `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池、成员机器上的 `172.27.x.x`，或误填的 `192.168.x.x` 地址池，建议删掉。
 
-三台机器只保留：
+基础三台机器只保留：
 
 | 设备 | Managed IP |
 |---|---|
