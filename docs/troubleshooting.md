@@ -16,6 +16,24 @@ Windows：
 .\scripts\windows\init-config.ps1
 ```
 
+## Windows 脚本无法运行
+
+如果 PowerShell 提示：
+
+```text
+无法加载文件 ... 因为在此系统上禁止运行脚本
+PSSecurityException
+UnauthorizedAccess
+```
+
+先在当前 PowerShell 窗口执行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+然后重新运行刚才的脚本。`-Scope Process` 只影响当前窗口，关掉窗口后会恢复。
+
 ## ZeroTier 无法连通
 
 检查：

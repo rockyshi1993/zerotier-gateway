@@ -2,6 +2,14 @@
 
 涉及防火墙规则写入时，请以管理员身份运行 PowerShell。
 
+如果 PowerShell 提示“无法加载文件”或 `PSSecurityException`，先在当前窗口执行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+这只会放行当前 PowerShell 窗口，关掉窗口后会恢复。
+
 ## 初始化
 
 第一次使用前，先生成配置：

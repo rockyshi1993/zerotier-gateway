@@ -165,6 +165,14 @@ sudo bash scripts/ubuntu/install.sh
 
 以管理员身份打开 PowerShell。
 
+先临时允许当前窗口运行本仓库脚本：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+这条命令只影响当前 PowerShell 窗口，关掉窗口后会恢复。
+
 家里电脑：
 
 ```powershell

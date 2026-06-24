@@ -124,6 +124,7 @@ sudo bash scripts/ubuntu/health-check.sh
 家里电脑用管理员 PowerShell：
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\setup.ps1 -Role Home
 .\scripts\windows\test-network.ps1
 ```
@@ -131,9 +132,12 @@ sudo bash scripts/ubuntu/health-check.sh
 公司电脑用管理员 PowerShell：
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\setup.ps1 -Role Work
 .\scripts\windows\test-network.ps1
 ```
+
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` 只对当前 PowerShell 窗口生效，关掉窗口后会恢复，用来避免 Windows 阻止本次 `.ps1` 脚本运行。
 
 然后到 ZeroTier Central：
 
