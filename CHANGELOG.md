@@ -8,6 +8,7 @@
 - Windows 防火墙规则写入现在会先检查管理员 PowerShell，`New-NetFirewallRule` 或 `Remove-NetFirewallRule` 失败时会立即停止，不再误报已应用。
 - README、安装指南和故障排查补充 `拒绝访问` / `Windows System Error 5` 的处理步骤，并说明哪些 Windows 电脑需要执行脚本。
 - README 和 Windows 安装文档补充管理员权限确认命令，拆分 `Home` / `Work` 执行块，避免用户在同一台电脑跑错角色。
+- README 目录导航改为按任务跳转，补充 Ubuntu、Windows、防火墙、代理、排除规则、中转和验收入口。
 
 ## [1.3.0] - 2026-06-23
 
