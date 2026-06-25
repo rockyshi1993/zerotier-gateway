@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 修复
+- README、安装指南、代理文档和故障排查补充 v2rayN 配置方式，说明可把 Ubuntu 代理作为 SOCKS 节点使用；已配置系统代理 `127.0.0.1:10808` 时通常不需要再开启 TUN，必须开启时要让 ZeroTier 网段和代理服务器地址直连。
 - 澄清代理生效机制：加入 ZeroTier 只代表能访问 Ubuntu 私有代理入口，不会自动代理上网；手动代理、PAC 和本地规则客户端分别有不同生效范围。
 - 澄清代理公网入口与 ZeroTier 私有入口的关系：已加入 ZeroTier 的客户端可继续使用 `10.246.77.1:10808`，更安全；没加入 ZeroTier 的设备，或实测服务器公网路径更快时，才使用 `PROXY_CONNECT_HOST:10808`。
 - Windows 防火墙计划现在会同时生成对端 Windows 直连规则和 `UBUNTU_ZT_IP` 中转规则；README、安装指南、Windows/中转/排障文档同步说明第一台中转服务器也需要目标 Windows 放行，切换新中转服务器时可通过同步 `.env` 后重跑 `setup.ps1 -ApplyFirewall` 自动更新。
