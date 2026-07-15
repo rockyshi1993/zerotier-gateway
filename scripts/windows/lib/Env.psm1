@@ -87,4 +87,49 @@ function Assert-ZtgEnv {
   }
 }
 
-Export-ModuleMember -Function Read-ZtgEnv,Assert-ZtgEnv
+function Set-ZtgEnvValues {
+  param(
+    [string]$Path = '.env',
+    [Parameter(Mandatory)][System.Collections.IDictionary]$Values
+  )
+
+  $resolved = Resolve-ZtgPath $Path
+  if (-not (Test-Path -LiteralPath $resolved)) {
+    throw "Config file not found: $resolved. Run .\scripts\windows\init-config.ps1 first."
+  }
+
+  foreach ($key in $Values.Keys) {
+    if ([string]$key -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+      throw "Invalid config key: $key"
+    }
+    if ([string]$Values[$key] -match "[\r\n]") {
+      throw "Config value for $key must be a single line."
+    }
+  }
+
+  $seen = @{}
+  $lines = Get-Content -LiteralPath $resolved | ForEach-Object {
+    $line = $_
+    if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=') {
+      $key = $Matches[1]
+      if ($Values.Contains($key)) {
+        $seen[$key] = $true
+        return "$key=$($Values[$key])"
+      }
+    }
+    return $line
+  }
+
+  foreach ($key in $Values.Keys) {
+    if (-not $seen.ContainsKey([string]$key)) {
+      $lines += "$key=$($Values[$key])"
+    }
+  }
+
+  $content = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($resolved, $content, $utf8NoBom)
+  return $resolved
+}
+
+Export-ModuleMember -Function Read-ZtgEnv,Assert-ZtgEnv,Set-ZtgEnvValues

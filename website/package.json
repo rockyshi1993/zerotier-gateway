@@ -1,0 +1,19 @@
+{
+  "name": "zerotier-gateway-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "rspress dev",
+    "check": "node scripts/check-docs.mjs",
+    "build": "rspress build",
+    "preview": "rspress preview",
+    "verify": "npm run check && npm run build"
+  },
+  "devDependencies": {
+    "@rspress/core": "2.0.17"
+  }
+}

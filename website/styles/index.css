@@ -1,0 +1,26 @@
+:root {
+  --rp-c-brand: #2563eb;
+  --rp-c-brand-light: #3b82f6;
+  --rp-c-brand-lighter: #60a5fa;
+  --rp-c-brand-dark: #1d4ed8;
+  --rp-c-brand-darker: #1e40af;
+}
+
+.rp-home-hero__title {
+  max-width: 18ch;
+}
+
+.rp-home-feature__item {
+  border: 1px solid var(--rp-c-divider-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

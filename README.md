@@ -1,922 +1,148 @@
 # ZeroTier Gateway
 
-这份文档教你完成三件事：让家里电脑和公司电脑互相远程、在 Ubuntu 上搭一个只给指定软件使用的私有代理、按需设置哪些流量不走代理。
+用现有脚本搭建 ZeroTier 私有远程访问、Ubuntu HTTP/SOCKS5 代理和可选中转。
 
-## 目录导航
+> 普通流程只需要运行脚本并按提示操作，不需要编辑脚本或手工填写整页参数。
 
-| 想做什么 | 直接跳到 |
-|---|---|
-| 先确认这个项目是不是适合你 | [适合什么场景](#适合什么场景)、[最终会得到什么](#最终会得到什么) |
-| 第一次安装前准备 | [开始前准备](#开始前准备)、[1. 获取项目](#1-获取项目)、[2. 生成配置](#2-生成配置) |
-| 配置 Ubuntu 代理节点 | [3. 配置 Ubuntu 节点](#3-配置-ubuntu-节点) |
-| 检查 ZeroTier Central 网段和地址池 | [ZeroTier Central 网段和地址池检查](#zerotier-central-网段和地址池检查) |
-| 配置家里和公司 Windows | [4. 配置两台 Windows](#4-配置两台-windows)、[打开管理员 PowerShell](#打开管理员-powershell)、[执行 Windows 脚本](#执行-windows-脚本) |
-| 有更多电脑加入 ZeroTier | [超过两台 Windows 怎么办](#超过两台-windows-怎么办) |
-| 写入或修复 Windows 防火墙 | [写入防火墙规则](#写入防火墙规则)、[防火墙写入失败](#防火墙写入失败) |
-| 开始远程访问 | [5. 远程访问](#5-远程访问) |
-| 开启 TUN 或全局代理后远程不通 | [TUN 或全局代理开启后远程不通](#tun-或全局代理开启后远程不通) |
-| 家庭宽带没有公网 IPv4 | [常见问题](#常见问题) |
-| 不清楚加入 ZeroTier 后代理是否会自动生效 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理) |
-| 使用 v2rayN 配置本仓库代理 | [v2rayN 如何配置](#v2rayn-如何配置)、[已配置 127.0.0.1:10808，还需要开启 TUN 吗](#已配置-12700110808还需要开启-tun-吗) |
-| 只让指定软件走代理 | [6. 给需要的软件配置代理](#6-给需要的软件配置代理)、[7. 排除 IP、域名或进程](#7-排除-ip域名或进程) |
-| 代理测速慢，想走服务器公网入口 | [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
-| 后续启用、修改或关闭代理账号密码 | [后续启用或修改代理账号密码](#后续启用或修改代理账号密码) |
-| 直连不稳定时处理 | [8. 远程直连不稳定时，再开启中转](#8-远程直连不稳定时再开启中转)、[验证中转是否成功](#验证中转是否成功) |
-| 有多台 Ubuntu 中转服务器，需要切换 | [多台中转服务器怎么切换](#多台中转服务器怎么切换) |
-| 检查是否配置成功 | [9. 最终验收](#9-最终验收) |
-| 查看常见问题、常见选择和更多文档 | [常见问题](#常见问题)、[常见选择](#常见选择)、[文档入口](#文档入口) |
+- [5 分钟快速开始](docs/quick-start.md)
+- [完整用户文档](docs/index.md)
+- 在线站点：`https://rockyshi1993.github.io/zerotier-gateway/`（合并到 `main` 并启用 GitHub Pages 后发布）
 
 ## 适合什么场景
 
-- 家里电脑和公司电脑需要互相远程，目标是低延迟、少折腾。
-- 某些软件需要通过 Ubuntu 节点代理上网，但不想把整台电脑都改成全局代理。
-- 需要排除指定 IP、域名或进程不走代理。
-- ZeroTier 直连效果不好时，希望有一个备用中转方案。
+- 家里和公司两台 Windows 需要通过 ZeroTier 互相远程。
+- 浏览器或指定软件需要使用 Ubuntu 节点代理，但不想改成全局代理。
+- 需要排除指定域名、IP 或进程不走代理。
+- ZeroTier 直连长期不稳定，需要 Ubuntu 作为备用中转。
 
-## 最终会得到什么
-
-完成后，你会有一个这样的网络：
+## 最简网络
 
 | 设备 | 作用 | 推荐 ZeroTier IP |
 |---|---|---|
 | Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选中转 | `10.246.77.1` |
-| 家里 Windows 电脑 | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
-| 公司 Windows 电脑 | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
+| 家里 Windows | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
+| 公司 Windows | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
-远程访问走两台 Windows 的 ZeroTier IP。代理上网只给需要的软件单独配置代理，不改整台电脑的全局网络。加入 ZeroTier 只代表电脑能访问 Ubuntu 的私有 IP，**不会自动让这台电脑代理上网**。默认代理入口是 `10.246.77.1:10808`；已经加入 ZeroTier 的电脑优先继续用这个私有入口，更安全。只有没加入 ZeroTier 的设备，或者你实测服务器公网 IP 路径更快时，才需要改用可选公网入口。
+远程工具填写对方 Windows 的 ZeroTier IP。代理默认填写 `10.246.77.1:10808`。
 
-上表是最小推荐结构。ZeroTier 网络里可以加入更多电脑，只要每台电脑有不同的 `10.246.77.x` 地址即可；本项目脚本默认只把“家里电脑”和“公司电脑”作为两台重点远程电脑来管理。
+> 加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。只有主动配置代理的软件才会走 Ubuntu 出口。
 
 ## 开始前准备
 
-你需要准备：
+1. 在 [ZeroTier Central](https://my.zerotier.com) 创建私有网络，并记下 16 位网络编号。
+2. 准备一台可使用 `sudo` 的 Ubuntu。
+3. 家里和公司两台 Windows 已安装 ZeroTier，并能使用管理员 PowerShell。
+4. 两台 Windows 已安装你平时使用的远程工具。
 
-1. 一个 ZeroTier 账号，并在 [ZeroTier Central](https://my.zerotier.com) 创建一个私有网络。
-2. 复制这个网络的 16 位网络编号，初始化脚本会问你这个编号。
-3. 一台 Ubuntu 机器，能使用 `sudo`。
-4. 家里和公司两台 Windows 电脑，能用管理员身份打开 PowerShell。
-5. 两台 Windows 上已经安装好你平时使用的远程工具，远程地址改填对方的 ZeroTier IP。
-6. 如果你想给代理加认证，再准备一个代理用户名和密码；默认可以不填。
+## 最快开始
 
-## 完整流程
-
-### 1. 获取项目
-
-在 Ubuntu 或 Windows 上都可以先获取仓库：
+先克隆项目：
 
 ```bash
 git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd zerotier-gateway
 ```
 
-Windows PowerShell：
-
-```powershell
-git clone https://github.com/rockyshi1993/zerotier-gateway.git
-cd .\zerotier-gateway
-```
-
-### 2. 生成配置
-
-运行初始化脚本，按提示输入 ZeroTier 网络编号和基础三台机器的 IP。一路回车会使用推荐默认值。
-
-Ubuntu：
+Ubuntu 运行：
 
 ```bash
 bash scripts/ubuntu/init-config.sh
-```
-
-Windows PowerShell：
-
-```powershell
-.\scripts\windows\init-config.ps1
-```
-
-脚本会在项目根目录生成 `.env`。最关键的几项会是这样：
-
-```text
-ZEROTIER_NETWORK_ID=你输入的 ZeroTier 网络编号
-UBUNTU_ZT_IP=10.246.77.1
-HOME_PC_ZT_IP=10.246.77.10
-WORK_PC_ZT_IP=10.246.77.20
-PROXY_PUBLIC_ACCESS=false
-PROXY_CONNECT_HOST=10.246.77.1
-PROXY_ALLOWED_CLIENT_CIDRS=
-PROXY_USERNAME=
-PROXY_PASSWORD=
-```
-
-`PROXY_USERNAME` 和 `PROXY_PASSWORD` 默认可以留空。两项都留空时，代理不启用认证；如果要启用认证，必须两项都填写。
-
-`PROXY_PUBLIC_ACCESS=false` 表示默认只走 ZeroTier 私有入口。已经加入 ZeroTier 的 Windows 优先使用 `PROXY_CONNECT_HOST=10.246.77.1`，也就是软件里填 `10.246.77.1:10808`。后续如果要给没加入 ZeroTier 的设备使用代理，或实测服务器公网 IP 路径更快，可以重新运行初始化脚本，选择启用代理公网入口；账号密码仍然可选，来源 IP 白名单也可选。白名单留空表示允许全部来源访问公网代理端口。Windows 里的 `PROXY_CONNECT_HOST` 只影响本仓库生成的测试、PAC 和本地规则文件，不会自动修改系统代理。
-
-如果已经有 `.env`，再次运行初始化脚本时，直接回车会沿用旧值。
-
-默认配置行为：
-
-- Ubuntu 脚本默认读取项目根目录 `.env`。
-- Windows 脚本默认读取项目根目录 `.env`。
-- 只有多配置或非默认路径时，才需要使用 `--env <path>` 或 `-Env <path>`。
-
-#### ZeroTier Central 网段和地址池检查
-
-到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持下面这种简单配置：
-
-| 位置 | 应该保留 |
-|---|---|
-| `Managed Routes` | `10.246.77.0/24 (LAN)` |
-| `IPv4 Auto-Assign` | 可以关闭自动分配，改为给基础三台机器手动固定 IP；更多设备也可以后续手动固定 |
-| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
-
-不要把 `10.246.77.0/24` 填到 `Add Routes` 下面的 `Via` 里。`Via` 是“让某个节点转发某个网段”时才用；本项目默认只需要 `10.246.77.0/24 (LAN)`。
-
-如果页面里还有下面这些内容，建议删掉：
-
-- `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池。
-- 成员机器上的 `172.27.x.x` Managed IP。
-- 误填到地址池里的 `192.168.x.x`。
-
-基础三台机器最终只需要这些 ZeroTier IP：
-
-| 设备 | Managed IP |
-|---|---|
-| Ubuntu 节点 | `10.246.77.1` |
-| 家里 Windows 电脑 | `10.246.77.10` |
-| 公司 Windows 电脑 | `10.246.77.20` |
-
-调整后，在家里和公司两台 Windows 上重启 ZeroTier 并检查：
-
-```powershell
-Restart-Service ZeroTierOneService
-zerotier-cli listnetworks
-```
-
-`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
-
-### 3. 配置 Ubuntu 节点
-
-```bash
 sudo bash scripts/ubuntu/install.sh --dry-run
 sudo bash scripts/ubuntu/install.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
-`install.sh` 会同时安装 ZeroTier 和代理服务。普通安装只需要跑这一条；如果 `health-check.sh` 提示 `sing-box-zt-proxy.service could not be found`，说明代理服务没有装上，先重新执行 `sudo bash scripts/ubuntu/install.sh`。
+然后在 ZeroTier Central 授权 Ubuntu，并固定为 `10.246.77.1`。
 
-如果安装时看到 `Unable to locate package sing-box`，说明当前 Ubuntu 源里没有 sing-box 包。更新到最新脚本后重新执行 `sudo bash scripts/ubuntu/install.sh`，脚本会自动添加官方 SagerNet apt 源后继续安装。
-
-然后到 ZeroTier Central：
-
-1. 找到刚加入网络的 Ubuntu 节点。
-2. 勾选授权。
-3. 把它的 ZeroTier IP 固定为 `.env` 里的 `10.246.77.1`。
-
-成功标准：
-
-- `health-check.sh` 能看到代理监听在 `10.246.77.1:10808`；如果你启用了公网入口，也可能看到 `0.0.0.0:10808`。
-- Ubuntu 节点在 ZeroTier Central 里显示在线。
-
-### 4. 配置两台 Windows
-
-两台 Windows 都已经加入同一个 ZeroTier 网络后，还需要分别在本机执行一次 Windows 脚本。脚本会读取 `.env`，告诉你这台电脑应该放行哪一个对端 ZeroTier IP。
-
-只加入 ZeroTier 网络、并且不需要被远程访问的电脑，可以不执行 `setup.ps1`；需要被另一台电脑远程访问，或需要本项目帮你检查网络和生成代理规则的 Windows，建议执行。
-
-#### 超过两台 Windows 怎么办
-
-可以加入更多电脑，但要按用途处理：
-
-| 用途 | 怎么做 |
-|---|---|
-| 只使用代理上网 | 加入 ZeroTier 并授权即可；软件代理填 `10.246.77.1:10808`，不需要执行 `setup.ps1` |
-| 只访问其他电脑 | 加入 ZeroTier 并授权即可；远程工具填目标电脑的 ZeroTier IP |
-| 也要被别人远程访问 | 给这台电脑固定一个新的 `10.246.77.x`，并在这台电脑防火墙里放行允许访问它的对端 IP |
-
-如果额外电脑也加入了 ZeroTier，软件代理仍然优先填 `10.246.77.1:10808`，这条路只在你的 ZeroTier 私有网络里可访问。只有额外电脑没有加入 ZeroTier，或你特意想让它走服务器公网路径测速时，才填 `.env` 里的 `PROXY_CONNECT_HOST:10808`。
-
-推荐把额外电脑固定到 `10.246.77.30`、`10.246.77.31` 这类地址，避开：
-
-```text
-10.246.77.1   Ubuntu 节点
-10.246.77.10  家里电脑
-10.246.77.20  公司电脑
-10.246.77.100-254  可选自动分配池
-```
-
-`setup.ps1 -Role Home` 和 `setup.ps1 -Role Work` 只管理默认两台重点远程电脑，不要在第三台电脑上随便选择 Home 或 Work。第三台电脑如果需要被远程访问，可以用管理员 PowerShell 手动加规则。下面例子表示：第三台电脑自己的 ZeroTier IP 是 `10.246.77.30`，只允许公司电脑 `10.246.77.20` 访问它的远程端口 `3389`：
-
-```powershell
-New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.20 -Profile Any
-```
-
-如果你信任整个 ZeroTier 私有网络，也可以把 `-RemoteAddress` 改成 `10.246.77.0/24`。不要把远程端口放行到公网。
-
-#### 打开管理员 PowerShell
-
-先在 Windows 上打开管理员 PowerShell：
-
-1. 关闭普通 PowerShell 窗口。
-2. 开始菜单搜索 `PowerShell` 或 `Windows Terminal`。
-3. 右键选择“以管理员身份运行”。
-4. 进入项目目录；下面以 `E:\Worker\zerotier-gateway` 为例，如果你的仓库在别的位置，把路径换成自己的仓库目录。
-
-确认当前窗口是不是管理员：
-
-```powershell
-([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-```
-
-返回 `True` 才能写入防火墙规则；如果返回 `False`，先关闭窗口，重新用“以管理员身份运行”打开。
-
-再临时允许当前窗口运行本仓库脚本：
+两台 Windows 都加入同一个 ZeroTier 网络并在 Central 授权、固定地址后，用管理员 PowerShell 运行初始化脚本：
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\windows\init-config.ps1
 ```
 
-这条命令只解决“脚本被 Windows 阻止运行”的问题，不会提升管理员权限。关掉当前 PowerShell 窗口后会恢复。
-
-#### 执行 Windows 脚本
-
-家里电脑执行：
+家里电脑运行：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
-.\scripts\windows\setup.ps1 -Role Home
+.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
 .\scripts\windows\test-network.ps1
 ```
 
-公司电脑执行：
+公司电脑运行：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
-.\scripts\windows\setup.ps1 -Role Work
+.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 .\scripts\windows\test-network.ps1
 ```
 
-不要在同一台电脑上把 `-Role Home` 和 `-Role Work` 都执行一遍。`Role` 表示“当前这台电脑是谁”，不是你要连接的目标。
+`Home` 和 `Work` 表示当前电脑的身份，不要在同一台电脑上混用。
 
-#### 授权并固定 IP
+使用微软远程桌面时，还要在被访问电脑运行 `enable-remote-desktop.ps1 -Apply`；完整顺序见[5 分钟快速开始](docs/quick-start.md)，实际成功以[安装与互访验证](docs/verification.md)为准。
 
-然后到 ZeroTier Central：
+## 常用任务
 
-1. 授权家里电脑和公司电脑。
-2. 把家里电脑固定为 `10.246.77.10`。
-3. 把公司电脑固定为 `10.246.77.20`。
-
-#### 写入防火墙规则
-
-如果要让脚本写入 Windows 防火墙规则，分别在对应电脑上执行：
-
-家里电脑：
-
-```powershell
-cd E:\Worker\zerotier-gateway
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-```
-
-公司电脑：
-
-```powershell
-cd E:\Worker\zerotier-gateway
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-```
-
-`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。脚本会写入两类规则：
-
-| 规则 | 用途 |
+| 你想做什么 | 直接查看 |
 |---|---|
-| 对端 Windows IP | 家里和公司通过 ZeroTier 直连远程 |
-| `UBUNTU_ZT_IP` | 直连不稳定时，允许 Ubuntu 中转服务器转发到这台 Windows |
+| 第一次完整配置 | [快速开始](docs/quick-start.md) |
+| 检查是否安装成功、两台电脑是否互相访问 | [安装与互访验证](docs/verification.md) |
+| 分别配置 Ubuntu 或 Windows | [Ubuntu 节点](docs/ubuntu.md) · [Windows 客户端](docs/windows.md) |
+| 公司访问家里或家里访问公司 | [远程访问](docs/remote.md) |
+| 给浏览器、v2rayN 或指定软件配置代理 | [代理上网](docs/proxy.md) |
+| 不经过 ZeroTier，直接使用公网代理 | [公网代理](docs/proxy-public.md) |
+| 添加多台代理服务器并切换 | [多台代理服务器](docs/proxy-multi-server.md) |
+| 排除域名、IP 或进程 | [代理排除规则](docs/proxy-rules.md) |
+| 直连不稳定时启用中转 | [中转兜底](docs/relay.md) |
+| 安装失败、权限报错或连不通 | [故障排查](docs/troubleshooting.md) |
+| 卸载或恢复 | [回滚与卸载](docs/rollback.md) |
 
-默认配置下，家里电脑会放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑会放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。如果你后续把中转服务器换成 `10.246.77.2`，先同步 Windows 这边 `.env` 里的 `UBUNTU_ZT_IP=10.246.77.2`，再在目标 Windows 上重跑对应的 `setup.ps1 -Role ... -ApplyFirewall`。
+## 代理怎么用
 
-查看脚本写入了哪些规则：
-
-```powershell
-# 家里电脑查看 Home 规则；公司电脑把 Home 改成 Work
-Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
-  Select-Object DisplayName,Enabled,Direction,Action,Profile
-
-Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
-  Get-NetFirewallAddressFilter |
-  Format-List RemoteAddress
-```
-
-家里电脑应该能看到 `ZT Gateway Remote Inbound Home 3389` 和 `ZT Gateway Relay Inbound Home 3389`。其中 `Remote` 规则放行公司电脑，`Relay` 规则放行当前 Ubuntu 中转服务器。如果你手动创建了别的规则名，例如 `ZT Relay Singapore Inbound 3389`，只有手动创建成功后才能用这个名字查询；脚本自动生成的规则名不是这个。
-
-#### 防火墙写入失败
-
-如果写入防火墙时看到红色报错：
-
-```text
-New-NetFirewallRule : 拒绝访问。
-Windows System Error 5
-```
-
-说明当前 PowerShell 没有管理员权限，或系统策略拒绝写入防火墙。先关闭当前窗口，重新用“以管理员身份运行”打开 PowerShell，进入项目目录后确认管理员状态：
-
-```powershell
-cd E:\Worker\zerotier-gateway
-([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-```
-
-返回 `True` 后再执行：
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-```
-
-公司电脑把最后一行改成：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-```
-
-成功标准：
-
-- 家里电脑能 `ping 10.246.77.20`。
-- 公司电脑能 `ping 10.246.77.10`。
-- `test-network.ps1` 没有关键失败项。
-- 执行 `-ApplyFirewall` 时没有红色报错，并看到 `Firewall rules applied.`。
-
-### 5. 远程访问
-
-远程工具里填写对方的 ZeroTier IP：
-
-| 方向 | 填写地址 |
-|---|---|
-| 公司访问家里 | `10.246.77.10` |
-| 家里访问公司 | `10.246.77.20` |
-
-远程工具本身建议走 ZeroTier 直连，不要强行走 Ubuntu 代理。这样延迟最低，也少一层转发。
-
-#### TUN 或全局代理开启后远程不通
-
-如果家里或公司电脑开启了 TUN、全局代理、加速器或其他接管系统流量的软件，远程可能变慢，甚至直接连不上。处理原则是：代理可以开，但 ZeroTier 网段和 ZeroTier 进程必须直连。
-
-在代理工具的直连或绕过规则里加入：
-
-```text
-10.246.77.0/24
-```
-
-如果代理工具支持按进程直连，把 ZeroTier 进程也加入直连。可用下面命令查看实际进程名和路径：
-
-```powershell
-Get-Process | Where-Object { $_.ProcessName -like "*ZeroTier*" } | Select-Object ProcessName,Path
-```
-
-远程工具本身也建议走直连；如果代理工具支持按进程规则，把远程工具的主进程、服务进程和辅助进程一起加入直连。
-
-改完后，两台 Windows 都执行：
-
-```powershell
-Restart-Service ZeroTierOneService
-zerotier-cli peers
-```
-
-公司访问家里时测 `ping -n 20 10.246.77.10`；家里访问公司时测 `ping -n 20 10.246.77.20`。
-
-如果 `peers` 里对方节点的 `path` 仍然显示为代理出口 IP，说明 ZeroTier 进程还在被 TUN 接管，需要继续检查代理工具的直连规则。
-
-### 6. 给需要的软件配置代理
-
-先分清三件事：
-
-| 你做了什么 | 会发生什么 | 会不会自动代理上网 |
-|---|---|---|
-| Windows 加入 ZeroTier | Windows 能访问 Ubuntu 的 `10.246.77.1` | 不会 |
-| Ubuntu 安装代理服务 | Ubuntu 提供 `10.246.77.1:10808` 代理入口 | 不会接管 Windows |
-| 在某个软件里配置代理 | 这个软件的流量才会走代理 | 会，只对这个软件生效 |
-
-所以，本地电脑加入 ZeroTier 后，只是“能连到代理入口”。要代理上网，还要在需要代理的软件、系统代理、PAC 或本地规则客户端里主动配置。
-
-#### 最简单用法：只给某个软件填代理
-
-在需要代理的软件里填写：
+已加入 ZeroTier 的设备优先使用私有入口：
 
 ```text
 地址：10.246.77.1
 端口：10808
 协议：HTTP 或 SOCKS5
-用户名：默认不填；启用认证时填 PROXY_USERNAME
-密码：默认不填；启用认证时填 PROXY_PASSWORD
 ```
 
-如果 `.env` 里没有填写 `PROXY_USERNAME` 和 `PROXY_PASSWORD`，软件里也不要填用户名和密码。没有配置代理的软件继续走本机原网络。
+没有配置代理的软件继续使用本机网络。公网代理入口、认证、PAC、进程排除和 TUN 使用判断都属于进阶场景，请看[代理上网](docs/proxy.md)。
 
-这种方式最直观，但有一个限制：软件只知道“走这个代理”，不会自动读取你 `.env` 里的排除规则。要让域名/IP/进程排除规则生效，看下一节。
+## 成功标准
 
-#### 代理入口怎么选
+- Ubuntu、家里电脑和公司电脑都已在 ZeroTier Central 授权，地址不冲突。
+- Ubuntu `health-check.sh` 能看到代理监听。
+- 两台 Windows 的 `test-network.ps1` 没有关键失败。
+- 远程工具使用对方 ZeroTier IP 可以连接。
+- 需要代理的软件能通过 `10.246.77.1:10808` 上网。
 
-| 当前设备 | 推荐代理地址 |
-|---|---|
-| 已加入这个 ZeroTier 网络 | `10.246.77.1:10808` |
-| 没加入 ZeroTier | `服务器公网IP:10808` |
-| 已加入 ZeroTier，但实测公网路径更快 | `服务器公网IP:10808` |
+这些结论不能只凭脚本“没有报错”判断。请按[安装与互访验证](docs/verification.md)运行服务、双向 ping、3389、实际远程登录和代理出口命令。
 
-#### v2rayN 如何配置
+## 出错时先做什么
 
-如果你已经在用 v2rayN，可以把本仓库的 Ubuntu 代理作为 v2rayN 里的一个 `SOCKS` 节点。推荐优先添加 SOCKS，不需要再单独添加 HTTP 节点。
-
-已加入 ZeroTier 的 Windows，节点这样填：
-
-```text
-类型：SOCKS
-地址：10.246.77.1
-端口：10808
-用户名：默认不填；启用认证时填 PROXY_USERNAME
-密码：默认不填；启用认证时填 PROXY_PASSWORD
-传输：tcp
-伪装：none
-TLS：关闭
-```
-
-如果你已经启用了代理公网入口，并且这台设备没有加入 ZeroTier，或者你实测服务器公网路径更快，可以把地址改成 Ubuntu 服务器公网 IP，端口仍然是 `10808`。
-
-添加后，在 v2rayN 主界面把这个节点设为活动节点，再开启 v2rayN 的“系统代理”。这时 Windows 系统代理会指向 v2rayN 的本地监听地址；下面以本地监听 `127.0.0.1:10808` 为例，如果你改过 v2rayN 本地端口，以实际设置为准：
-
-```text
-127.0.0.1:10808
-```
-
-链路会变成：
-
-```text
-浏览器/软件 -> 127.0.0.1:10808 -> v2rayN -> 10.246.77.1:10808 -> Ubuntu 出口
-```
-
-验证：
-
-```powershell
-curl.exe --ssl-no-revoke -x socks5h://127.0.0.1:10808 https://api.ipify.org
-curl.exe --ssl-no-revoke -x socks5h://127.0.0.1:10808 https://www.google.com/generate_204 -I
-```
-
-第一条能返回 IP，第二条返回 `204`，说明 v2rayN 的本地代理已经能通过 Ubuntu 出口访问网络。
-
-#### 已配置 127.0.0.1:10808，还需要开启 TUN 吗？
-
-一般不需要。
-
-如果 v2rayN 已经开启“系统代理”，并且 Windows 系统代理已经指向 v2rayN 本地监听地址，例如 `127.0.0.1:10808`，浏览器、Git、npm 和大多数遵守系统代理的软件通常已经会走 v2rayN。此时再开启 TUN，反而可能把 ZeroTier 网段、远程工具或代理服务器连接本身也接管进去，造成远程变慢、ZeroTier 不稳定或代理绕路。
-
-只有下面情况才考虑开启 TUN：
-
-- 某些软件完全不支持系统代理。
-- 游戏、命令行或特殊客户端需要强制代理。
-- 你明确希望几乎所有流量都由 v2rayN 接管。
-
-如果必须开启 TUN，建议先这样设置：
-
-```text
-自动路由：开启
-严格路由：先关闭
-协议栈：gvisor
-MTU：1500；如果仍不稳定再改 1400
-IPv6：没有公网 IPv6 时关闭
-```
-
-同时在 v2rayN 的直连或绕过规则里保留：
-
-```text
-10.246.77.0/24
-10.246.77.1
-服务器公网IP
-127.0.0.1
-localhost
-```
-
-这样可以避免访问 Ubuntu 代理入口和远程电脑的流量被 TUN 再次代理。
-
-#### Windows 上更新代理配置是为了什么
-
-Windows 仓库里的 `.env` 不会自动修改系统代理，也不会自动让整台电脑走代理。它只给下面这些脚本使用：
-
-| 脚本 | 用 `.env` 做什么 |
-|---|---|
-| `test-proxy.ps1` | 测试 `PROXY_CONNECT_HOST:PROXY_PORT` 能不能连通 |
-| `generate-proxy-pac.ps1` | 生成带域名/IP 排除规则的 `artifacts/proxy.pac` |
-| `generate-client-rules.ps1` | 生成带域名/IP/进程排除规则的 `artifacts/windows-local-client.json` |
-
-如果你只是手动在某个软件里填 `10.246.77.1:10808`，Windows 这边不一定要同步 `.env`。如果你要用测试脚本、PAC 或本地规则客户端，就要让 Windows `.env` 里的代理字段和 Ubuntu 保持一致。
-
-#### 代理上网提速：可选公网入口
-
-如果你发现 `10.246.77.1:10808` 代理测速慢，但同一台 Ubuntu 服务器上的 Outline、v2rayN 或其他公网入口很快，通常原因是：本仓库默认代理入口走 ZeroTier 私有网络，客户端到 Ubuntu 的这段链路可能绕路；Outline/v2rayN 往往是直接连服务器公网 IP。
-
-这种情况下可以开启代理公网入口。它只优化“代理上网”，不改变远程控制路径。远程控制仍然优先走两台 Windows 的 ZeroTier IP。
-
-注意：开启公网入口只是让服务器公网 IP 也能访问代理，并不要求已经加入 ZeroTier 的 Windows 必须改用公网 IP。已加入 ZeroTier 的电脑如果 `10.246.77.1:10808` 速度正常，继续用这个私有入口更安全；没加入 ZeroTier 的设备，或实测公网路径更快时，才使用公网入口。
-
-在 Ubuntu 节点重新运行初始化脚本：
+Ubuntu：
 
 ```bash
-cd ~/zerotier-gateway
-bash scripts/ubuntu/init-config.sh
-```
-
-走到“是否启用代理公网入口提速”时选择启用。脚本会自动把代理监听地址设为 `0.0.0.0`，并尝试识别 Ubuntu 服务器公网 IP：
-
-```text
-代理监听地址：脚本自动设置为 0.0.0.0
-客户端连接代理地址：能自动识别时直接回车；识别失败时填 Ubuntu 服务器公网 IP
-允许访问公网代理的公网 IP/CIDR：可留空；留空表示全部来源
-```
-
-生成后的 `.env` 会类似这样：
-
-```text
-PROXY_BIND_IP=0.0.0.0
-PROXY_PUBLIC_ACCESS=true
-PROXY_CONNECT_HOST=服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=
-PROXY_PORT=10808
-PROXY_USERNAME=
-PROXY_PASSWORD=
-```
-
-这里两个字段不要混淆：
-
-| 字段 | 作用 | 常见填法 |
-|---|---|---|
-| `PROXY_BIND_IP` | Ubuntu 代理监听在哪些网卡上 | 私有入口用 `10.246.77.1`；启用公网入口时用 `0.0.0.0` |
-| `PROXY_CONNECT_HOST` | Windows 生成测试、PAC、本地规则时连接哪个地址 | 已加入 ZeroTier 的电脑可继续用 `10.246.77.1`；没加入 ZeroTier 或要走公网路径时填服务器公网 IP |
-
-账号密码仍然可以不填；两项都留空时不启用认证。`PROXY_ALLOWED_CLIENT_CIDRS` 留空时，脚本会把 `10808` 按“全部来源”放行。这样最省事，但公网代理端口会直接暴露到互联网；长期使用时建议填写公司、家里公网 IP，或至少启用代理账号密码。
-
-让配置生效：
-
-```bash
-sudo bash scripts/ubuntu/install-proxy.sh --dry-run
-sudo bash scripts/ubuntu/install-proxy.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
-然后按实际使用方式处理 Windows：
-
-如果只是手动给软件填代理，直接把软件里的地址改成你要使用的入口即可。如果要用 `test-proxy.ps1`、PAC 或本地规则客户端，则需要同步 Windows 仓库里的 `.env`。你可以手动同步下面字段，也可以在 Windows 重新运行 `.\scripts\windows\init-config.ps1`，输入同一套代理配置：
-
-```text
-PROXY_PUBLIC_ACCESS
-PROXY_CONNECT_HOST
-PROXY_ALLOWED_CLIENT_CIDRS
-PROXY_PORT
-PROXY_USERNAME
-PROXY_PASSWORD
-```
-
-如果 Windows 已经加入 ZeroTier，并且你想继续走私有代理入口，`PROXY_CONNECT_HOST` 保持 `10.246.77.1` 即可；如果这台 Windows 没加入 ZeroTier，或你想测试服务器公网路径，就把 `PROXY_CONNECT_HOST` 改成服务器公网 IP。`test-proxy.ps1`、PAC 和本地规则客户端都会按这个字段生成入口。
+Windows：
 
 ```powershell
-.\scripts\windows\test-proxy.ps1
-.\scripts\windows\generate-proxy-pac.ps1
-.\scripts\windows\generate-client-rules.ps1
-```
-
-如果 `test-proxy.ps1` 仍然连不上，先检查三处：
-
-1. 走私有入口时，Windows 能 ping 通 `10.246.77.1`，并且 Ubuntu 健康检查能看到 `10.246.77.1:10808` 或 `0.0.0.0:10808` 正在监听。
-2. 走公网入口时，`PROXY_CONNECT_HOST` 是服务器公网 IP，云厂商防火墙允许你的来源公网 IP 访问 `10808/tcp`。
-3. 如果 `PROXY_ALLOWED_CLIENT_CIDRS` 留空，Ubuntu 的 `ufw` 会允许全部来源访问 `10808/tcp`；如果填写了白名单，只会放行白名单里的来源。
-
-#### 后续启用或修改代理账号密码
-
-可以后续重新配置，不需要重新加入 ZeroTier，也不需要从头安装整套网络。代理服务跑在 Ubuntu 节点上，所以最终以 Ubuntu 节点项目根目录里的 `.env` 为准。
-
-在 Ubuntu 节点的仓库目录重新运行初始化脚本：
-
-```bash
-cd ~/zerotier-gateway
-bash scripts/ubuntu/init-config.sh
-```
-
-脚本检测到已有 `.env` 时，直接回车会沿用旧值；走到“是否启用代理用户名和密码”时按需要选择：
-
-- 想启用或修改账号密码：选择启用，然后输入新的用户名和密码。
-- 想关闭账号密码：选择不启用，脚本会把 `PROXY_USERNAME` 和 `PROXY_PASSWORD` 清空。
-
-然后只刷新 Ubuntu 代理服务：
-
-```bash
-sudo bash scripts/ubuntu/install-proxy.sh
-sudo bash scripts/ubuntu/health-check.sh
-```
-
-刷新后同步客户端：
-
-- 手动给软件填代理的：在软件代理设置里填新的用户名和密码；如果已经关闭认证，就把软件里的用户名和密码也清空。
-- 使用 `artifacts/windows-local-client.json` 的：把 Windows 仓库里的 `.env` 也改成同一套账号密码，然后重新生成本地规则：
-
-```powershell
-.\scripts\windows\generate-client-rules.ps1
-```
-
-测试代理：
-
-```powershell
+.\scripts\windows\show-diagnostics.ps1
+.\scripts\windows\test-network.ps1
 .\scripts\windows\test-proxy.ps1
 ```
 
-### 7. 排除 IP、域名或进程
+仍未解决时，按症状查看[故障排查](docs/troubleshooting.md)。看到“拒绝访问”或 `Windows System Error 5` 时，请确认当前窗口是管理员 PowerShell。
 
-排除规则不会因为写进 `.env` 就立刻生效。它取决于你把规则用在哪里：
+## 文档
 
-| 想排除什么 | 使用方式 | 什么时候生效 | 不能做什么 |
-|---|---|---|---|
-| 域名、域名后缀、IP 网段 | 生成 PAC | 浏览器、系统代理或软件使用这个 PAC 时生效 | 不能按进程判断 |
-| 域名、IP、进程 | 生成本地规则客户端配置 | 你把 `windows-local-client.json` 导入本地规则客户端，并由它接管流量时生效 | 仅生成文件不会接管流量 |
-| 某个软件手动填代理 | 软件自己的代理设置 | 只对这个软件生效 | 本仓库的排除规则不会自动套进去 |
-
-#### 排除域名或 IP
-
-编辑 `.env`：
-
-```text
-DIRECT_DOMAINS=localhost,*.local,*.company.com
-DIRECT_DOMAIN_SUFFIXES=.local
-DIRECT_IP_CIDRS=10.246.77.0/24,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-```
-
-生成 PAC：
-
-```powershell
-.\scripts\windows\generate-proxy-pac.ps1
-```
-
-输出文件在 `artifacts/proxy.pac`。
-
-把这个 PAC 配到浏览器、系统代理或支持 PAC 的软件里后，域名和 IP 排除才会生效。
-
-#### 排除进程
-
-进程排除只能在 Windows 本机通过本地规则客户端实现。Ubuntu 代理只能看到网络请求，看不到 Windows 上的进程名。
-
-编辑 `.env`：
-
-```text
-PROXY_MODE=local-rule-client
-DIRECT_PROCESS_GROUPS=remote-tools,chat-tools,game-tools
-DIRECT_PROCESS_NAMES=
-DIRECT_PROCESS_PATHS=
-DIRECT_PROCESS_PATH_REGEX=
-```
-
-生成本地规则客户端配置：
-
-```powershell
-.\scripts\windows\generate-client-rules.ps1
-```
-
-输出文件在 `artifacts/windows-local-client.json`。本仓库负责生成规则文件，实际接管进程流量需要导入你正在使用的本地规则客户端。
-
-多进程软件不要只填一个主程序名。应按安装目录、路径正则或完整进程名清单一起处理；如果软件会启动服务进程、辅助进程或更新进程，也要一并加入规则。
-
-### 8. 远程直连不稳定时，再开启中转
-
-只有家里和公司长期无法直连，或者远程延迟明显不稳定时，再考虑中转。
-
-默认配置下，Ubuntu 会用 `systemd-socket-proxyd` 创建 TCP 中转入口：
-
-| 远程方向 | 连接地址 | 实际转发到 |
-|---|---|---|
-| 公司访问家里 | `10.246.77.1:443` | `10.246.77.10:3389` |
-| 家里访问公司 | `10.246.77.1:444` | `10.246.77.20:3389` |
-
-`RELAY_PORT=443` 表示第一个中转入口从 `443` 开始；如果 `REMOTE_PORTS` 有多个端口，脚本会继续使用后续端口。Ubuntu 只监听自己的 ZeroTier IP，不把远程端口暴露到公网。
-
-被中转访问的 Windows 必须允许当前 Ubuntu 中转服务器访问远程端口。最新脚本会在你执行 `setup.ps1 -Role Home -ApplyFirewall` 或 `setup.ps1 -Role Work -ApplyFirewall` 时自动放行 `.env` 里的 `UBUNTU_ZT_IP`。默认第一台中转服务器是 `10.246.77.1`，所以不需要额外手动加一条 `10.246.77.1` 规则；只有你还在使用旧脚本、Windows `.env` 没同步，或公司安全软件阻止脚本写入时，才需要手动添加。
-
-#### 多台中转服务器怎么切换
-
-可以让多台 Ubuntu 服务器加入同一个 ZeroTier 网络，每台服务器都要有不同的 ZeroTier IP。示例：
-
-| 服务器 | 用途 | ZeroTier IP |
-|---|---|---|
-| 旧服务器 | 原来的代理 / 中转 | `10.246.77.1` |
-| 新服务器 | 新增中转 | `10.246.77.2` |
-
-在新服务器上，`.env` 里的 `UBUNTU_ZT_IP` 必须填新服务器自己的 ZeroTier IP：
-
-```env
-UBUNTU_ZT_IP=10.246.77.2
-HOME_PC_ZT_IP=10.246.77.10
-WORK_PC_ZT_IP=10.246.77.20
-RELAY_PORT=443
-REMOTE_PORTS=3389
-```
-
-然后只在你要作为中转的那台 Ubuntu 上执行：
-
-```bash
-sudo bash scripts/ubuntu/install-relay.sh --dry-run
-sudo bash scripts/ubuntu/install-relay.sh
-```
-
-切换中转服务器时，Windows 不需要安装中转服务。你需要把远程工具里的地址从旧服务器换成新服务器：
-
-| 远程方向 | 旧服务器 | 新服务器 |
-|---|---|---|
-| 公司访问家里 | `10.246.77.1:443` | `10.246.77.2:443` |
-| 家里访问公司 | `10.246.77.1:444` | `10.246.77.2:444` |
-
-但被中转访问的 Windows 必须允许新服务器访问远程端口。如果 Windows 防火墙已经放行可信的 `10.246.77.0/24`，通常不需要再加规则；如果只放行了对方电脑 IP 或旧服务器 IP，请同步 Windows 这边的 `.env`，把 `UBUNTU_ZT_IP` 改成新服务器 IP 后重跑对应角色的防火墙脚本。
-
-目标是家里电脑，就在家里电脑执行：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-```
-
-目标是公司电脑，就在公司电脑执行：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-```
-
-如果暂时不方便更新脚本或同步 `.env`，可以在目标 Windows 的管理员 PowerShell 里手动加规则。下面例子表示允许新服务器 `10.246.77.2` 访问这台 Windows 的 `3389`：
-
-```powershell
-New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.2 -Profile Any
-```
-
-手动规则的 `DisplayName` 可以自己定。后续查询时必须使用你实际创建的名字；如果你没有创建过 `ZT Relay Singapore Inbound 3389`，用这个名字查询会提示找不到对象。
-
-切换后先从 Windows 验证新服务器入口：
-
-```powershell
-Test-NetConnection 10.246.77.2 -Port 443
-Test-NetConnection 10.246.77.2 -Port 444
-```
-
-多台 Windows 加入 ZeroTier 没问题；但当前中转脚本默认只管理 `.env` 里的 `HOME_PC_ZT_IP` 和 `WORK_PC_ZT_IP` 两台重点远程电脑。其他电脑只用代理或只访问别人时，不需要中转配置；其他电脑也要被远程访问时，优先走它自己的 ZeroTier IP 直连，确实需要中转时再单独规划目标 IP 和中转端口。
-
-Ubuntu 上先预览：
-
-```bash
-sudo bash scripts/ubuntu/install-relay.sh --dry-run
-```
-
-确认输出里的转发方向正确后再安装：
-
-```bash
-sudo bash scripts/ubuntu/install-relay.sh
-```
-
-看到下面这类输出，只代表中转 socket 已经安装并启用，还需要继续按下一节验证链路：
-
-```text
-created symlink ...
-[INFO] Relay sockets installed.
-```
-
-#### 验证中转是否成功
-
-先在 Ubuntu 上确认两个中转入口已经监听：
-
-```bash
-systemctl is-active zerotier-gateway-relay-home-3389.socket
-systemctl is-active zerotier-gateway-relay-work-3389.socket
-ss -lntp | grep -E '10.246.77.1:(443|444)'
-```
-
-成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。如果没有监听，先确认 Ubuntu 的 ZeroTier IP 是 `10.246.77.1`：
-
-```bash
-zerotier-cli listnetworks
-```
-
-再从两台 Windows 测 Ubuntu 中转端口：
-
-公司电脑测“公司访问家里”的入口：
-
-```powershell
-Test-NetConnection 10.246.77.1 -Port 443
-```
-
-家里电脑测“家里访问公司”的入口：
-
-```powershell
-Test-NetConnection 10.246.77.1 -Port 444
-```
-
-成功时应看到：
-
-```text
-TcpTestSucceeded : True
-```
-
-如果这里是 `False`，说明 Windows 到 Ubuntu 中转入口不通。先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
-
-```bash
-sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
-sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
-sudo ufw status
-```
-
-再确认 Ubuntu 能访问两台 Windows 的远程端口：
-
-```bash
-nc -vz 10.246.77.10 3389
-nc -vz 10.246.77.20 3389
-```
-
-如果提示没有 `nc` 或 `nc: command not found`，先安装：
-
-```bash
-sudo apt-get update
-sudo apt-get install -y netcat-openbsd
-```
-
-安装后再执行 `nc -vz`。成功时应看到 `succeeded`。如果命令能运行但连接失败，去对应 Windows 上重新写入防火墙规则。最新脚本会同时放行对端 Windows IP 和 `.env` 里的 `UBUNTU_ZT_IP`，所以先确认 Windows 的 `.env` 里 `UBUNTU_ZT_IP` 是当前中转服务器，比如第一台是 `10.246.77.1`，第二台可以是 `10.246.77.2`。
-
-家里电脑：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-```
-
-公司电脑：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-```
-
-全部验证通过后，远程工具里不再填对方 Windows 的 ZeroTier IP，而是按下面填写 Ubuntu 的中转地址：
-
-| 远程方向 | 远程工具里填写 |
-|---|---|
-| 公司访问家里 | `10.246.77.1:443` |
-| 家里访问公司 | `10.246.77.1:444` |
-
-直连恢复稳定后，建议切回对方 Windows 的 ZeroTier IP。
-
-停用中转：
-
-```bash
-sudo bash scripts/ubuntu/disable-relay.sh
-```
-
-停用脚本会关闭并移除本项目生成的 `zerotier-gateway-relay-*.socket` 和 `zerotier-gateway-relay-*.service`。如果你以后改过 `RELAY_PORT` 或 `REMOTE_PORTS`，它也会清理历史残留的中转单元，不会影响 ZeroTier 本身和代理服务。
-
-### 9. 最终验收
-
-全部完成后，至少确认这几项：
-
-- Ubuntu、家里电脑、公司电脑都在同一个 ZeroTier 网络里，并且已授权。
-- 基础三台机器的 ZeroTier IP 分别是 `10.246.77.1`、`10.246.77.10`、`10.246.77.20`。
-- 如果有更多服务器或电脑加入 ZeroTier，也逐台确认已授权、IP 不冲突。
-- `zerotier-cli listnetworks` 里没有残留 `172.27.x.x`。
-- 家里和公司能互相访问对方的 ZeroTier IP。
-- 远程工具使用对方 ZeroTier IP 能连上。
-- 需要代理的软件使用代理入口能上网：已加入 ZeroTier 的电脑优先用 `10.246.77.1:10808`；没加入 ZeroTier 或实测公网路径更快时，用 `PROXY_CONNECT_HOST:10808`。
-- 不需要代理的软件仍然走本机原网络。
-- 如果配置了排除规则，PAC 或本地客户端规则已经重新生成。
-
-## 常见问题
-
-### 家庭宽带不提供公网 IPv4，会影响远程吗？
-
-会。你仍然可以正常用 IPv4 上网，但家里路由器拿到的是运营商大内网地址，不是别人能直接访问的公网 IPv4。常见判断方式：
-
-- 路由器里的 `WAN IP` 是 `100.64.0.0` 到 `100.127.255.255` 之间的地址，例如 `100.68.x.x`。
-- 运营商明确说家庭宽带不提供公网 IPv4，只有企业宽带提供。
-- `zerotier-cli peers` 里公司到家里长期显示 `RELAY`，或者远程 ping 延迟高、丢包明显。
-
-这种情况下，在家里路由器里做端口映射通常解决不了问题，因为流量还要先经过运营商 NAT。ZeroTier Central 只保留 `10.246.77.0/24 (LAN)` 即可，不需要继续给 `Via` 或地址池加复杂路由。
-
-处理建议：
-
-1. 先向运营商申请公网 IPv4 或动态公网 IPv4。如果运营商明确拒绝，就不要继续反复改家里路由器端口映射。
-2. 改用离家里和公司更近的 VPS 做中转或反向连接。国内、香港、日本或新加坡节点通常比美国节点更适合低延迟远程。
-3. 如果家里和公司两边都有可用 IPv6，可以尝试让 ZeroTier 走 IPv6 直连；但这依赖两边网络和防火墙，不保证一定成功。
-
-不要把远程桌面或远程控制端口直接暴露到公网。推荐路径仍然是优先 ZeroTier 直连；直连长期不稳定时，再使用可信的中转节点。
-
-## 常见选择
-
-| 你想做什么 | 看这里 |
-|---|---|
-| 只想先跑通远程 | 先完成第 1 到第 5 步 |
-| 只给浏览器或某个软件代理 | 完成第 6 步 |
-| 默认代理入口慢，但服务器公网代理很快 | 看 [代理上网提速：可选公网入口](#代理上网提速可选公网入口) |
-| 排除公司内网、局域网或指定域名 | 做第 7 步里的 PAC |
-| 排除某个软件或多进程软件 | 做第 7 步里的本地规则客户端配置 |
-| 家庭宽带没有公网 IPv4 | 看 [常见问题](#常见问题) |
-| 远程延迟高、直连不稳定 | 再看第 8 步 |
-| 安装失败或连不通 | 看 [故障排查](docs/troubleshooting.md) |
-
-## 文档入口
-
-- [安装指南](docs/install.md)
-- [Ubuntu 节点](docs/ubuntu.md)
-- [Windows 客户端](docs/windows.md)
-- [远程访问](docs/remote.md)
-- [代理上网](docs/proxy.md)
-- [代理排除规则](docs/proxy-rules.md)
-- [中转](docs/relay.md)
-- [故障排查](docs/troubleshooting.md)
+- [文档首页](docs/index.md)
+- [安装总览](docs/install.md)
+- [安装与互访验证](docs/verification.md)
 - [安全说明](docs/security.md)
-- [回滚与卸载](docs/rollback.md)
+- [发布验证（维护者）](docs/release.md)
+
+## License
+
+[MIT](LICENSE)

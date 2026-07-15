@@ -4,11 +4,19 @@
 
 ## [未发布]
 
+### 新增
+- 新增 Rspress 用户文档站、GitHub Pages 工作流和“安装与互访验证”页面，按 Ubuntu 服务、三节点入网、双向访问、RDP、代理出口和中转逐层验收。
+- 新增 `enable-remote-desktop.ps1`，检查 Windows 版本并以预览/应用两阶段启用 RDP 主机和网络级别身份验证。
+- 新增 `configure-proxy-rules.ps1`，通过交互或命令参数配置域名、IP 和进程直连规则，并可直接生成 PAC 与本地客户端配置。
+- 新增公网代理和多台代理服务器独立任务页；公网入口、节点切换和验证均通过脚本或客户端操作完成。
+
 ### 修复
+- 文档精简不再删除安装成功、双向 ping、3389、代理真实出口等历史验证命令；文档检查会验证这些命令仍有明确归属，并阻止用户页面重新出现手工编辑 `.env` 的操作路径。
+- `test-proxy.ps1` 现在会先验证 TCP 入口，再通过代理访问真实出口 URL；可用 `-SkipExitCheck` 只做端口检查。
 - README、安装指南、代理文档和故障排查补充 v2rayN 配置方式，说明可把 Ubuntu 代理作为 SOCKS 节点使用；已配置系统代理 `127.0.0.1:10808` 时通常不需要再开启 TUN，必须开启时要让 ZeroTier 网段和代理服务器地址直连。
 - 澄清代理生效机制：加入 ZeroTier 只代表能访问 Ubuntu 私有代理入口，不会自动代理上网；手动代理、PAC 和本地规则客户端分别有不同生效范围。
 - 澄清代理公网入口与 ZeroTier 私有入口的关系：已加入 ZeroTier 的客户端可继续使用 `10.246.77.1:10808`，更安全；没加入 ZeroTier 的设备，或实测服务器公网路径更快时，才使用 `PROXY_CONNECT_HOST:10808`。
-- Windows 防火墙计划现在会同时生成对端 Windows 直连规则和 `UBUNTU_ZT_IP` 中转规则；README、安装指南、Windows/中转/排障文档同步说明第一台中转服务器也需要目标 Windows 放行，切换新中转服务器时可通过同步 `.env` 后重跑 `setup.ps1 -ApplyFirewall` 自动更新。
+- Windows 防火墙计划现在会同时生成对端 Windows 直连规则和中转规则；README、安装指南、Windows/中转/排障文档说明第一台中转服务器也需要目标 Windows 放行，切换新中转服务器时可重跑初始化与 `setup.ps1 -ApplyFirewall` 自动更新，不要求编辑配置文件。
 - README、安装指南和中转文档补充多台 Ubuntu 中转服务器的切换流程，说明新服务器需要独立 ZeroTier IP、目标 Windows 需要放行新服务器 IP，并补充切换后的 Windows 验证命令；验收清单补充更多设备授权和 IP 冲突检查；测试覆盖第二台中转服务器的 dry-run 渲染。
 - README、安装指南和 Windows 文档补充两台以上电脑加入 ZeroTier 时的处理方式，说明额外电脑只用代理时不需要执行 `setup.ps1`，需要被远程访问时应单独放行对应 ZeroTier IP。
 - 代理配置新增可选公网入口：`PROXY_PUBLIC_ACCESS`、`PROXY_CONNECT_HOST`、`PROXY_ALLOWED_CLIENT_CIDRS`，默认仍使用 ZeroTier 私有入口；公网入口会自动设置监听地址并尝试识别服务器公网 IP，来源白名单留空表示全部来源，账号密码保持可选。

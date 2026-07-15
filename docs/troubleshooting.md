@@ -1,16 +1,5 @@
 # 故障排查
 
-## 目录导航
-
-- [找不到配置文件](#找不到配置文件)
-- [Windows 脚本无法运行](#windows-脚本无法运行)
-- [Windows 防火墙规则写入失败](#windows-防火墙规则写入失败)
-- [ZeroTier 无法连通](#zerotier-无法连通)
-- [ZeroTier Central 网段或地址池配置不干净](#zerotier-central-网段或地址池配置不干净)
-- [开启 TUN 或全局代理后远程不通](#开启-tun-或全局代理后远程不通)
-- [代理无法连通](#代理无法连通)
-- [进程排除没有命中](#进程排除没有命中)
-
 ## 找不到配置文件
 
 脚本默认读取项目根目录下的 `.env`。
@@ -74,7 +63,7 @@ Windows System Error 5
 4. 确认管理员状态返回 `True`：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 ```
 
@@ -82,11 +71,11 @@ cd E:\Worker\zerotier-gateway
 6. 家里电脑重新执行 `.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall`。
 7. 公司电脑重新执行 `.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall`。
 
-最新脚本会同时写入两类规则：对端 Windows 的 ZeroTier IP 用于直连，`.env` 里的 `UBUNTU_ZT_IP` 用于中转。如果公司电脑或安全软件禁止修改防火墙，请在系统防火墙里手动允许对应来源访问远程端口。默认示例里，家里电脑放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。
+最新脚本会同时写入两类规则：对端 Windows 的 ZeroTier IP 用于直连，初始化时选择的 Ubuntu IP 用于中转。如果公司电脑或安全软件禁止修改防火墙，请联系系统管理员允许对应来源访问远程端口。默认示例里，家里电脑放行公司电脑 `10.246.77.20` 和 Ubuntu `10.246.77.1`；公司电脑放行家里电脑 `10.246.77.10` 和 Ubuntu `10.246.77.1`。
 
 如果是第三台或更多 Windows 加入 ZeroTier，`setup.ps1 -Role Home/Work` 不会自动管理这些额外电脑。额外电脑只用代理或只访问别人时不需要执行 `setup.ps1`；如果它也要被远程访问，请在额外电脑上手动放行允许访问它的对端 ZeroTier IP，或放行可信的 `10.246.77.0/24`。
 
-如果你新增了另一台 Ubuntu 中转服务器，Windows 不需要安装中转服务；但目标 Windows 必须允许新服务器的 ZeroTier IP 访问远程端口。比如新服务器是 `10.246.77.2`，目标 Windows 只放行过旧服务器或对方电脑 IP，就需要同步 Windows `.env` 里的 `UBUNTU_ZT_IP=10.246.77.2`，再重跑对应角色的 `setup.ps1 -ApplyFirewall`。如果已经放行可信的 `10.246.77.0/24`，通常不用再加规则。
+如果你新增了另一台 Ubuntu 中转服务器，Windows 不需要安装中转服务；但目标 Windows 必须允许新服务器的 ZeroTier IP 访问远程端口。比如新服务器是 `10.246.77.2`，先在目标 Windows 重跑 `init-config.ps1`，一路回车保留现值、只更新 Ubuntu IP，再重跑对应角色的 `setup.ps1 -ApplyFirewall`。
 
 旧脚本或临时补救时，也可以在目标 Windows 的管理员 PowerShell 手动添加：
 
@@ -197,9 +186,9 @@ zerotier-cli peers
 2. sing-box 服务正在运行。
 3. 默认私有入口时，代理监听在 `10.246.77.1:10808`。
 4. 已加入 ZeroTier 的 Windows 优先测试 `10.246.77.1:10808`；如果这条能通，就不需要为了代理改成公网 IP。
-5. 如果启用了公网入口，且客户端要走公网路径，`PROXY_PUBLIC_ACCESS=true`，并且 `PROXY_CONNECT_HOST` 是 Ubuntu 服务器公网 IP。
+5. 如果客户端要走公网路径，确认 Ubuntu 初始化脚本中已选择启用公网入口，并填入服务器公网 IP。
 6. 如果启用了公网入口，且客户端要走公网路径，云防火墙和 Ubuntu 防火墙允许客户端访问 `10808/tcp`。
-7. 如果启用了公网入口，`PROXY_ALLOWED_CLIENT_CIDRS` 可以留空；留空表示允许全部来源访问代理端口。填写后只允许指定来源。
+7. 如果启用了公网入口，初始化时的来源公网 IP/CIDR 可以留空；留空表示允许全部来源访问代理端口。
 8. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
 9. 如果刚修改过代理账号密码、代理入口或白名单，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件、PAC 或本地规则也已经同步。
 
@@ -237,16 +226,9 @@ sudo bash scripts/ubuntu/install.sh
 .\scripts\windows\test-proxy.ps1
 ```
 
-`test-proxy.ps1` 会连接 `.env` 里的 `PROXY_CONNECT_HOST:PROXY_PORT`。如果你已经启用公网入口，但输出里仍然测试 `10.246.77.1:10808`，说明 Windows 这边仍在测试 ZeroTier 私有入口；这对已经加入 ZeroTier 的 Windows 是正常且更安全的。只有你想测试公网路径，或这台设备没有加入 ZeroTier，才需要把 Windows `.env` 的 `PROXY_CONNECT_HOST` 改成服务器公网 IP。
+`test-proxy.ps1` 会测试 Windows 初始化时选择的代理入口，并继续验证真实出口。如果已经启用公网入口，但输出仍测试 `10.246.77.1:10808`，说明 Windows 当前仍使用 ZeroTier 私有入口；这对已加入 ZeroTier 的 Windows 是正常且更安全的。要测试公网路径时，重新运行 Windows 初始化脚本并选择服务器公网 IP。
 
-如果默认私有入口慢，但公网代理工具很快，按下面方式优化：
-
-```text
-PROXY_PUBLIC_ACCESS=true
-PROXY_BIND_IP=0.0.0.0
-PROXY_CONNECT_HOST=Ubuntu服务器公网IP
-PROXY_ALLOWED_CLIENT_CIDRS=
-```
+如果默认私有入口慢，但公网代理工具很快，按[公网代理](proxy-public.md)重新运行初始化脚本并验证公网入口。
 
 然后在 Ubuntu 上执行：
 

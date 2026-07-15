@@ -7,7 +7,7 @@
 1. 关闭普通 PowerShell 窗口。
 2. 开始菜单搜索 `PowerShell` 或 `Windows Terminal`。
 3. 右键选择“以管理员身份运行”。
-4. 进入项目目录；下面以 `E:\Worker\zerotier-gateway` 为例，如果你的仓库在别的位置，把路径换成自己的仓库目录。
+4. 在资源管理器中打开仓库目录，再从地址栏或右键菜单打开管理员 PowerShell。以下命令均在仓库根目录执行。
 
 确认当前窗口是不是管理员：
 
@@ -33,19 +33,27 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\init-config.ps1
 ```
 
+需要让这台电脑接受微软远程桌面连接时，再执行：
+
+```powershell
+.\scripts\windows\enable-remote-desktop.ps1 -Apply
+```
+
+脚本会检查 Windows 版本并保持网络级别身份验证开启；Windows Home 不支持作为微软远程桌面主机，可继续使用其他远程控制工具。
+
 两台 Windows 都加入同一个 ZeroTier 网络后，分别在对应电脑执行一次：
 
 家里电脑：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Home
 ```
 
 公司电脑：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Work
 ```
 
@@ -60,7 +68,7 @@ cd E:\Worker\zerotier-gateway
 
 `-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。如果某台 Windows 只加入 ZeroTier 网络，但不需要被另一台电脑远程访问，也不需要本项目生成规则，可以不执行 `setup.ps1`。
 
-如果你有多台 Ubuntu 中转服务器，目标 Windows 只需要允许“当前要用的中转服务器”访问远程端口。同步 Windows `.env` 里的 `UBUNTU_ZT_IP` 后，重跑对应角色的 `setup.ps1 -ApplyFirewall` 即可自动更新规则。手动 `New-NetFirewallRule` 只适合旧脚本或临时补救。
+如果你有多台 Ubuntu 中转服务器，目标 Windows 只需要允许“当前要用的中转服务器”访问远程端口。重新运行 `init-config.ps1`，一路回车保留现值、只更新 Ubuntu IP，再重跑对应角色的 `setup.ps1 -ApplyFirewall` 即可自动更新规则。
 
 查看脚本写入的规则：
 
@@ -87,7 +95,7 @@ ZeroTier 网络可以加入两台以上 Windows。默认脚本只内置两个角
 
 额外电脑可以固定为 `10.246.77.30`、`10.246.77.31` 等地址。只使用代理或只访问别人的电脑，不需要执行 `setup.ps1`。
 
-如果额外电脑也加入了 ZeroTier，软件代理仍然优先填 `10.246.77.1:10808`。只有额外电脑没有加入 ZeroTier，或你特意想让它走服务器公网路径测速时，才填 `.env` 里的 `PROXY_CONNECT_HOST:10808`。
+如果额外电脑也加入了 ZeroTier，软件代理仍然优先填 `10.246.77.1:10808`。额外电脑没有加入 ZeroTier，或需要走服务器公网路径时，按[公网代理](proxy-public.md)配置。
 
 如果额外电脑也要被远程访问，请在那台电脑上用管理员 PowerShell 手动放行允许访问它的对端 ZeroTier IP。例如只允许公司电脑访问第三台电脑的 `3389`：
 
@@ -100,14 +108,14 @@ New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Acti
 家里电脑：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
 ```
 
 公司电脑：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
 ```
 
@@ -116,7 +124,7 @@ cd E:\Worker\zerotier-gateway
 如果看到 `New-NetFirewallRule : 拒绝访问。` 或 `Windows System Error 5`，说明当前窗口没有足够权限，或系统策略拒绝写入防火墙。请用“以管理员身份运行”的 PowerShell 重新执行，并先运行：
 
 ```powershell
-cd E:\Worker\zerotier-gateway
+# 在仓库根目录执行
 ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
@@ -128,6 +136,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\test-proxy.ps1
 .\scripts\windows\show-diagnostics.ps1 -FindProcess "远程"
 ```
+
+完整的安装成功、双向互访、3389 和代理出口检查见[安装与互访验证](verification.md)。
 
 ## 配置路径
 

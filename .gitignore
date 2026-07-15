@@ -23,6 +23,8 @@ Thumbs.db
 
 # Test output
 test-output/
+.playwright-cli/
+output/
 
 # Temporary Files
 *.tmp
@@ -51,6 +53,11 @@ zerotier-one-backup/
 # Documentation Build
 docs/_build/
 site/
+website/node_modules/
+website/dist/
+
+# Local nested checkout (never publish as a submodule)
+/zerotier-gateway/
 
 # Generated runtime artifacts
 artifacts/*
