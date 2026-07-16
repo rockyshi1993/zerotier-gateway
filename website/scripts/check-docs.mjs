@@ -161,8 +161,117 @@ for (const command of ['manage-rate-limit.sh add --apply', 'manage-rate-limit.sh
 }
 
 const publishSite = read(join(docsDir, 'publish-site.md'));
-for (const command of ['manage-publish.sh add-ip --apply', 'manage-publish.sh add-domain --staging --apply', 'manage-publish.sh test-domain --name', 'manage-publish.sh update-domain --name mysite --production --apply']) {
-  if (!publishSite.includes(command)) errors.push(`公网站点页缺少命令: ${command}`);
+const publishSiteRequiredFacts = [
+  '外网浏览器',
+  '公网 Ubuntu',
+  '网站电脑',
+  '全部管理命令都在公网 Ubuntu 的仓库目录执行',
+  '没有公网可达的 Ubuntu',
+  '无需编辑 `.env` 或脚本文件',
+  'http://203.0.113.10:18080',
+  'https://site.example.com',
+  '每个站点使用不同的 `--name`',
+  'IP+端口模式还必须使用不同的公网端口',
+  '域名模式使用不同的域名',
+  '确认项目 unit、目标 TCP 和本机转发',
+  '检查目标 TCP、HTTP、HTTPS 和证书',
+  '不要直接公开 RDP、SSH、数据库或管理后台'
+];
+for (const fact of publishSiteRequiredFacts) {
+  if (!publishSite.includes(fact)) errors.push(`公网站点页缺少首次成功事实: ${fact}`);
+}
+
+const publishSiteHeadings = [
+  '## 先判断是否适用',
+  '## 看懂连接方向',
+  '## A. 公网 IP + 端口',
+  '## B. 域名 + 自动 HTTPS',
+  '## 添加多个站点',
+  '## 更新、删除和高级配置',
+  '## 实现与安全边界',
+  '## 安全判断'
+];
+let previousPublishHeadingIndex = -1;
+for (const heading of publishSiteHeadings) {
+  const index = publishSite.indexOf(heading);
+  if (index === -1) {
+    errors.push(`公网站点页缺少章节: ${heading}`);
+  } else if (index <= previousPublishHeadingIndex) {
+    errors.push(`公网站点页章节顺序错误: ${heading}`);
+  } else {
+    previousPublishHeadingIndex = index;
+  }
+}
+
+const publishSection = (start, end) => {
+  const startIndex = publishSite.indexOf(start);
+  if (startIndex === -1) return '';
+  const endIndex = publishSite.indexOf(end, startIndex + start.length);
+  return publishSite.slice(startIndex, endIndex === -1 ? publishSite.length : endIndex);
+};
+const requireTokensInOrder = (label, content, tokens) => {
+  let offset = 0;
+  for (const token of tokens) {
+    const index = content.indexOf(token, offset);
+    if (index === -1) {
+      errors.push(`公网站点页${label}缺少或顺序错误: ${token}`);
+      return;
+    }
+    offset = index + token.length;
+  }
+};
+
+const publishIpSection = publishSection('## A. 公网 IP + 端口', '## B. 域名 + 自动 HTTPS');
+requireTokensInOrder('无域名路径', publishIpSection, [
+  'nc -vz 10.246.77.30 3000',
+  'manage-publish.sh add-ip',
+  '--name mysite',
+  '--listen-port 18080',
+  '--target-ip 10.246.77.30',
+  '--target-port 3000',
+  'manage-publish.sh add-ip',
+  '--name mysite',
+  '--listen-port 18080',
+  '--target-ip 10.246.77.30',
+  '--target-port 3000',
+  '--apply',
+  'manage-publish.sh status --name mysite',
+  'manage-publish.sh test --name mysite',
+  'http://203.0.113.10:18080'
+]);
+
+const publishDomainSection = publishSection('## B. 域名 + 自动 HTTPS', '## 添加多个站点');
+requireTokensInOrder('域名路径', publishDomainSection, [
+  'site.example.com',
+  'TCP `80`、`443`',
+  'manage-publish.sh add-domain',
+  '--name mysite',
+  '--domain site.example.com',
+  '--target-ip 10.246.77.30',
+  '--target-port 3000',
+  '--staging',
+  'manage-publish.sh add-domain',
+  '--name mysite',
+  '--domain site.example.com',
+  '--target-ip 10.246.77.30',
+  '--target-port 3000',
+  '--staging',
+  '--apply',
+  'manage-publish.sh status-domain --name mysite',
+  'manage-publish.sh test-domain --name mysite',
+  'manage-publish.sh update-domain --name mysite --production',
+  'manage-publish.sh update-domain --name mysite --production --apply',
+  'https://site.example.com'
+]);
+
+for (const command of [
+  'manage-publish.sh update-ip --name mysite --target-port 8080 --apply',
+  'manage-publish.sh remove --name mysite --apply',
+  'manage-publish.sh remove-domain --name mysite --apply',
+  '--source-cidr 198.51.100.25/32',
+  '--basic-auth-user visitor'
+]) {
+  if (!publishSite.includes(command)) errors.push(`公网站点页缺少管理命令或选项: ${command}`);
 }
 
 const changelog = read(join(rootDir, 'CHANGELOG.md'));
