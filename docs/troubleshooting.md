@@ -4,6 +4,8 @@
 
 脚本默认读取项目根目录下的 `.env`。
 
+新增管理命令不要求打开该文件；升级、代理池、限速和发布问题优先运行各自的 `status`/`test` 命令。
+
 修复方式：
 
 ```bash
@@ -84,6 +86,47 @@ New-NetFirewallRule -DisplayName "ZT Relay Server 10.246.77.2 Inbound 3389" -Dir
 ```
 
 手动规则的 `DisplayName` 可以自己定，但后续查询必须使用实际创建过的名字。脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`；如果你没有创建过 `ZT Relay Singapore Inbound 3389`，用这个名字查询会提示找不到对象。
+
+## 本地自动代理入口不可用
+
+```powershell
+.\scripts\windows\manage-proxy-pool.ps1 -Action Status
+.\scripts\windows\manage-proxy-pool.ps1 -Action Test
+Get-ScheduledTask -TaskPath '\ZeroTierGateway\' -TaskName ProxySelector
+```
+
+控制器与 sing-box 日志位于 `%ProgramData%\ZeroTierGateway\runtime\`；优先查看 `selector.log` 和 `sing-box.stderr.log`。项目会保留一份轮转备份，避免故障日志持续无界增长。
+
+- 所有节点 `unhealthy`：先直接测试每台 `10.246.77.x:10808`，恢复至少一台服务器。
+- Task 未运行：确认当前用户已登录，并重新预览/执行 `-Action Enable -Apply`。
+- `127.0.0.1:20808` 被其他进程占用：不要强制结束未知进程；先查 `Get-NetTCPConnection -LocalPort 20808`。
+- 急需恢复工作：在 v2rayN 临时切回保留的 `.1` 或 `.3` 直连节点。
+
+## 限速规则未生效或影响范围不对
+
+```bash
+sudo bash scripts/ubuntu/manage-rate-limit.sh status --name <规则名>
+sudo bash scripts/ubuntu/manage-rate-limit.sh test --name <规则名>
+sudo systemctl status zerotier-gateway-rate-limit.service
+```
+
+如果 RDP、relay 或未限速客户端也变慢，先执行 `disable --name <规则名> --apply`。不要运行 `tc qdisc del` 或全局 filter flush；项目删除命令只处理有 state 与稳定 handle 的规则。
+
+## 公网端口或域名外部不可访问
+
+先分层，不要直接重装：
+
+```bash
+sudo bash scripts/ubuntu/manage-publish.sh test --name <映射名>
+sudo bash scripts/ubuntu/manage-publish.sh test-domain --name <域名映射名>
+sudo ss -lntp
+```
+
+- 目标检查失败：修复 ZeroTier 目标 IP、目标端口或站点服务。
+- 本机转发失败：查看对应 `zerotier-gateway-publish-*` unit。
+- 本机通过、外部失败：检查云安全组、路由器 NAT、运营商入站限制和实际公网 IP。
+- 域名 DNS 不正确：先修正 A 记录；Caddy不会伪造证书成功。
+- 80/443 被占用：项目会停止，不接管第三方 Caddy/nginx/Apache；选择现有反向代理集成需要另行规划。
 
 ## ZeroTier 无法连通
 

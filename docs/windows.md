@@ -143,6 +143,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 默认配置路径是项目根目录下的 `.env`。
 
+如果有两台以上 Ubuntu 代理，希望软件只配置一个本地地址，请按[多台代理服务器](proxy-multi-server.md)使用节点池命令；不要手工维护控制器 JSON 或计划任务。
+
 只有配置文件不在默认位置时，才需要显式指定路径：
 
 ```powershell

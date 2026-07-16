@@ -13,6 +13,7 @@ const requiredDocs = [
   'quick-start.md',
   'verification.md',
   'install.md',
+  'upgrade.md',
   'ubuntu.md',
   'windows.md',
   'remote.md',
@@ -20,6 +21,8 @@ const requiredDocs = [
   'proxy-public.md',
   'proxy-multi-server.md',
   'proxy-rules.md',
+  'rate-limit.md',
+  'publish-site.md',
   'relay.md',
   'troubleshooting.md',
   'security.md',
@@ -80,6 +83,14 @@ if (stepCount !== 7) {
   errors.push(`快速开始应有 7 个编号步骤，当前为 ${stepCount}`);
 }
 
+const home = read(join(docsDir, 'index.md'));
+const homeFrontmatter = home.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
+for (const match of homeFrontmatter.matchAll(/^\s*link:\s*(\/[^\s#]+)\s*$/gm)) {
+  if (match[1] !== '/' && !match[1].endsWith('.html')) {
+    errors.push(`首页公开任务链接必须显式对应静态 HTML: ${match[1]}`);
+  }
+}
+
 const userDocs = markdownFiles
   .filter((file) => !file.endsWith('release.md'))
   .map((file) => ({ file, content: read(file) }));
@@ -133,6 +144,32 @@ for (const requiredLink of ['verification.md', 'proxy-public.md', 'proxy-multi-s
   }
 }
 
+for (const requiredLink of ['upgrade.md', 'rate-limit.md', 'publish-site.md']) {
+  if (!readme.includes(requiredLink)) {
+    errors.push(`README 缺少新增任务入口: ${requiredLink}`);
+  }
+}
+
+const multiServer = read(join(docsDir, 'proxy-multi-server.md'));
+for (const command of ['manage-proxy-pool.ps1 -Action Add', '127.0.0.1:20808', '-Action Enable -Apply', '-Action Status']) {
+  if (!multiServer.includes(command)) errors.push(`多代理页缺少自动切换步骤: ${command}`);
+}
+
+const rateLimit = read(join(docsDir, 'rate-limit.md'));
+for (const command of ['manage-rate-limit.sh add --apply', 'manage-rate-limit.sh test --name', 'manage-rate-limit.sh remove --name']) {
+  if (!rateLimit.includes(command)) errors.push(`限速页缺少命令: ${command}`);
+}
+
+const publishSite = read(join(docsDir, 'publish-site.md'));
+for (const command of ['manage-publish.sh add-ip --apply', 'manage-publish.sh add-domain --staging --apply', 'manage-publish.sh test-domain --name', 'manage-publish.sh update-domain --name mysite --production --apply']) {
+  if (!publishSite.includes(command)) errors.push(`公网站点页缺少命令: ${command}`);
+}
+
+const changelog = read(join(rootDir, 'CHANGELOG.md'));
+for (const change of ['no-restart 管理升级命令', '127.0.0.1:20808', '按客户端 IP 与代理端口', '公网 IP+端口映射']) {
+  if (!changelog.includes(change)) errors.push(`CHANGELOG 未发布段缺少新增能力: ${change}`);
+}
+
 const proxyRules = read(join(docsDir, 'proxy-rules.md'));
 for (const command of ['configure-proxy-rules.ps1', 'winget install sing-box', 'sing-box run -c']) {
   if (!proxyRules.includes(command)) {
@@ -165,6 +202,25 @@ for (const route of requiredDocs.map((name) => name === 'index.md' ? "link: '/'"
   if (!config.includes(route)) {
     errors.push(`Rspress sidebar 缺少路由: ${route}`);
   }
+}
+
+const release = read(join(docsDir, 'release.md'));
+if (release.includes('没有 GitHub Actions 工作流')) {
+  errors.push('发布文档仍声称没有 GitHub Actions，与 Pages 工作流矛盾');
+}
+for (const releaseFact of ['.github/workflows/pages.yml', 'npm run verify', 'Source', 'GitHub Actions']) {
+  if (!release.includes(releaseFact)) errors.push(`发布文档缺少 Pages 验收事实: ${releaseFact}`);
+}
+
+const accessibility = read(join(docsDir, 'public', 'site-accessibility.js'));
+for (const semantic of [".rp-home-feature__card--clickable", "setAttribute('role', 'link')", "setAttribute('tabindex', '0')", "event.key !== 'Enter' && event.key !== ' '"]) {
+  if (!accessibility.includes(semantic)) errors.push(`首页任务卡片缺少键盘/语义增强: ${semantic}`);
+}
+if (!accessibility.includes('a[href], button, [role="link"], [role="button"]')) {
+  errors.push('Rspress 交互元素缺少 Enter 冒泡保护');
+}
+for (const semantic of ['ztg-skip-link', "setAttribute('role', 'main')", "setAttribute('role', 'navigation')", "document.createElement('h1')", "main.id = 'main-content'"]) {
+  if (!accessibility.includes(semantic)) errors.push(`站点缺少页面语义增强: ${semantic}`);
 }
 
 if (errors.length > 0) {

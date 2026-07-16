@@ -8,7 +8,8 @@ const userSidebar = [
       { text: '文档首页', link: '/' },
       { text: '5 分钟快速开始', link: '/quick-start' },
       { text: '安装与互访验证', link: '/verification' },
-      { text: '安装总览', link: '/install' }
+      { text: '安装总览', link: '/install' },
+      { text: '安全升级', link: '/upgrade' }
     ]
   },
   {
@@ -25,7 +26,9 @@ const userSidebar = [
       { text: '代理上网', link: '/proxy' },
       { text: '公网代理', link: '/proxy-public' },
       { text: '多台代理服务器', link: '/proxy-multi-server' },
-      { text: '代理排除规则', link: '/proxy-rules' }
+      { text: '代理排除规则', link: '/proxy-rules' },
+      { text: '按客户端限速', link: '/rate-limit' },
+      { text: '公网站点发布', link: '/publish-site' }
     ]
   },
   {
@@ -64,6 +67,7 @@ export default defineConfig({
       { text: '验证', link: '/verification' },
       { text: '远程访问', link: '/remote' },
       { text: '代理上网', link: '/proxy' },
+      { text: '公网站点', link: '/publish-site' },
       { text: '故障排查', link: '/troubleshooting' },
       { text: '维护者', link: '/release' }
     ],

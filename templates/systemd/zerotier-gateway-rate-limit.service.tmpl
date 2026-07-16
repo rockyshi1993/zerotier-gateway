@@ -1,0 +1,13 @@
+# Managed-By: zerotier-gateway-rate-limit
+[Unit]
+Description=Restore ZeroTier Gateway per-client proxy rate limits
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash "{{RATE_LIMIT_MANAGER_PATH}}" restore --apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

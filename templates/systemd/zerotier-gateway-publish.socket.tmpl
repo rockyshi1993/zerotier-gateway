@@ -1,0 +1,12 @@
+# Managed-By: {{PUBLISH_MARKER}}
+[Unit]
+Description=ZeroTier Gateway public TCP mapping {{PUBLISH_NAME}}
+
+[Socket]
+ListenStream={{PUBLISH_LISTEN}}
+NoDelay=true
+FreeBind=false
+MaxConnections=256
+
+[Install]
+WantedBy=sockets.target

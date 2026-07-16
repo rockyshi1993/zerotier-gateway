@@ -9,9 +9,10 @@
   "scripts": {
     "dev": "rspress dev",
     "check": "node scripts/check-docs.mjs",
+    "check:built": "node scripts/check-built-site.mjs",
     "build": "rspress build",
     "preview": "rspress preview",
-    "verify": "npm run check && npm run build"
+    "verify": "npm run check && npm run build && npm run check:built"
   },
   "devDependencies": {
     "@rspress/core": "2.0.17"

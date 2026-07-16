@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zerotier-gateway.local/state-schema-v1.json",
+  "title": "ZeroTier Gateway managed object state",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "objectVersion",
+    "owner",
+    "objectType",
+    "objectName",
+    "enabled",
+    "lastAppliedVersion"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "objectVersion": { "type": "integer", "minimum": 1 },
+    "owner": { "const": "zerotier-gateway" },
+    "objectType": {
+      "enum": ["installation", "proxy-node", "proxy-pool", "rate-limit", "publish-ip", "publish-domain", "publish-firewall"]
+    },
+    "objectName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "enabled": { "type": "boolean" },
+    "lastAppliedVersion": { "type": "string", "minLength": 1 },
+    "generation": { "type": "integer", "minimum": 1 },
+    "desiredHash": { "type": "string" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

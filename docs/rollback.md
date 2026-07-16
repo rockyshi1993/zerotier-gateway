@@ -16,6 +16,21 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 该命令会停用并移除本项目生成的 `zerotier-gateway-relay-*.socket` 和 `zerotier-gateway-relay-*.service`。默认不会影响 ZeroTier 本身和代理服务。
 
+新增能力按对象单独关闭或删除，不需要卸载整套网络：
+
+```bash
+sudo bash scripts/ubuntu/manage-rate-limit.sh disable --name <规则名> --apply
+sudo bash scripts/ubuntu/manage-rate-limit.sh remove --name <规则名> --apply
+sudo bash scripts/ubuntu/manage-publish.sh remove --name <映射名> --apply
+sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name <域名映射名> --apply
+```
+
+管理层升级只回退 state，使用升级输出的 backup id：
+
+```bash
+sudo bash scripts/ubuntu/upgrade.sh --rollback <backup-id>
+```
+
 ## Windows
 
 用管理员 PowerShell 移除本项目创建的 Windows 防火墙规则：
@@ -23,6 +38,24 @@ sudo bash scripts/ubuntu/disable-relay.sh
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\setup.ps1 -Rollback
+```
+
+停用自动代理入口但保留节点：
+
+```powershell
+.\scripts\windows\manage-proxy-pool.ps1 -Action Disable -Apply
+```
+
+完全移除自动代理任务和项目运行文件：
+
+```powershell
+.\scripts\windows\manage-proxy-pool.ps1 -Action Remove -Apply -ConfirmRemoval
+```
+
+Windows 管理状态回退：
+
+```powershell
+.\scripts\windows\upgrade.ps1 -Rollback <backup-id> -Apply
 ```
 
 生成的 PAC 和本地客户端配置位于 `artifacts/` 目录，可按需手动删除。

@@ -14,6 +14,8 @@
 - 浏览器或指定软件需要使用 Ubuntu 节点代理，但不想改成全局代理。
 - 需要排除指定域名、IP 或进程不走代理。
 - ZeroTier 直连长期不稳定，需要 Ubuntu 作为备用中转。
+- 有多台代理服务器，希望 Windows 只配置一个自动切换入口。
+- 需要按客户端限制代理速度，或从公网发布一个明确的本地站点。
 
 ## 最简网络
 
@@ -91,6 +93,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 | 不经过 ZeroTier，直接使用公网代理 | [公网代理](docs/proxy-public.md) |
 | 添加多台代理服务器并切换 | [多台代理服务器](docs/proxy-multi-server.md) |
 | 排除域名、IP 或进程 | [代理排除规则](docs/proxy-rules.md) |
+| 正在使用旧版本，需要安全升级 | [安全升级](docs/upgrade.md) |
+| 给指定代理客户端限制速度 | [按客户端限速](docs/rate-limit.md) |
+| 通过公网 IP+端口或域名访问站点 | [公网站点发布](docs/publish-site.md) |
 | 直连不稳定时启用中转 | [中转兜底](docs/relay.md) |
 | 安装失败、权限报错或连不通 | [故障排查](docs/troubleshooting.md) |
 | 卸载或恢复 | [回滚与卸载](docs/rollback.md) |
@@ -106,6 +111,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 没有配置代理的软件继续使用本机网络。公网代理入口、认证、PAC、进程排除和 TUN 使用判断都属于进阶场景，请看[代理上网](docs/proxy.md)。
+
+多台 Ubuntu 自动切换时，软件日常只使用 `127.0.0.1:20808`；公网访问本地站点使用独立发布命令，不要把 SOCKS 代理端口当作 Web 站点入口。
 
 ## 成功标准
 

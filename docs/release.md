@@ -1,6 +1,6 @@
 # 发布验证
 
-本文记录正式发布前后的最小检查链。当前发布版本为 `v1.3.0`。
+本文记录正式发布前后的最小检查链。当前已发布版本为 `v1.3.0`；仓库中的 `VERSION` 是下一版本候选，未完成真实环境和远端检查前不要把它视为已发布版本。
 
 ## 发布前检查
 
@@ -40,6 +40,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/ProxyRules.
 
 ```bash
 git diff --check
+```
+
+验证用户文档和 GitHub Pages 构建产物：
+
+```bash
+cd website
+npm ci
+npm run verify
+cd ..
 ```
 
 ## 发布步骤
@@ -86,13 +95,15 @@ gh release view v1.3.0
 
 再次确认 README 的快速开始仍指向当前主流程：
 
-- 默认读取项目根目录 `.env`。
+- 普通用户通过 `init-config.sh` 或 `init-config.ps1` 生成项目配置，不需要手工编辑 `.env`。
 - Ubuntu 入口为 `scripts/ubuntu/install.sh`。
 - Windows 入口为 `scripts/windows/setup.ps1`。
 - 代理排除规则入口为 `docs/proxy-rules.md`。
 
+确认仓库的 **Settings → Pages → Build and deployment → Source** 已选择 **GitHub Actions**，再检查 `Documentation site` 工作流的 build 和 deploy 都成功；最后直接打开站点首页、快速开始和至少一个任务页，确认刷新后仍能访问。
+
 ## 已知限制
 
 - 本项目当前没有包管理器发布面，不执行 npm、PyPI 或容器镜像发布。
-- 本项目当前没有 GitHub Actions 工作流；远端 CI 验收为不适用，本地测试是发布前主验证链。
+- `.github/workflows/pages.yml` 只构建和部署文档站；脚本测试仍需在发布前本地执行，远端 Pages 部署结果需要在推送后单独验收。
 - 真实 ZeroTier 网络、Ubuntu 服务安装和 Windows 防火墙变更需要在目标机器上按安装指南实测。

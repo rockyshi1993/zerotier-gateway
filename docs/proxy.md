@@ -100,6 +100,8 @@ localhost
 - ZeroTier 私有入口慢，或客户端没有加入 ZeroTier：[公网代理：不经过 ZeroTier](proxy-public.md)。
 - 要部署多个地区并在客户端切换：[多台代理服务器](proxy-multi-server.md)。
 - 要让域名、IP 或进程直连：[代理排除规则](proxy-rules.md)。
+- 要让多个 Ubuntu 在一个本地入口后自动切换：[多台代理服务器](proxy-multi-server.md)。
+- 要限制某个客户端经代理的最高速度：[按客户端限速](rate-limit.md)。
 
 ## 后续启用或修改账号密码
 

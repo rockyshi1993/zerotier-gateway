@@ -1,0 +1,16 @@
+# Managed-By: {{PUBLISH_MARKER}}
+[Unit]
+Description=ZeroTier Gateway target proxy {{PUBLISH_NAME}}
+Requires={{PUBLISH_SOCKET_UNIT}}
+After={{PUBLISH_SOCKET_UNIT}} network-online.target
+
+[Service]
+Type=simple
+ExecStart={{SOCKET_PROXYD_PATH}} {{PUBLISH_TARGET}}
+Restart=on-failure
+RestartSec=3s
+User=nobody
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

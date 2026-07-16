@@ -23,6 +23,8 @@ sudo bash scripts/ubuntu/health-check.sh
 
 默认代理入口是 `10.246.77.1:10808`，只供 ZeroTier 私有网络内访问。代理测速慢或客户端未加入 ZeroTier 时，按[公网代理](proxy-public.md)重新运行初始化脚本开启公网入口，不需要编辑配置文件。
 
+已有节点升级、按客户端限速和公网站点发布分别使用[安全升级](upgrade.md)、[按客户端限速](rate-limit.md)和[公网站点发布](publish-site.md)中的专项命令；它们默认关闭，不会随基础安装自动启用。
+
 安装完成后使用[Ubuntu 安装成功验证](verification.md#1-ubuntu-安装成功)检查服务、网络和监听地址。
 
 ## 系统服务
