@@ -18,6 +18,7 @@ const requiredDocs = [
   'windows.md',
   'remote.md',
   'proxy.md',
+  'exit-node.md',
   'proxy-public.md',
   'proxy-multi-server.md',
   'proxy-rules.md',
@@ -138,7 +139,7 @@ for (const anchor of historicalValidationAnchors) {
   }
 }
 
-for (const requiredLink of ['verification.md', 'proxy-public.md', 'proxy-multi-server.md']) {
+for (const requiredLink of ['verification.md', 'exit-node.md', 'proxy-public.md', 'proxy-multi-server.md']) {
   if (!readme.includes(requiredLink) || !quickStart.includes('verification.md') && requiredLink === 'verification.md') {
     errors.push(`README/快速开始缺少关键任务入口: ${requiredLink}`);
   }
@@ -158,6 +159,40 @@ for (const command of ['manage-proxy-pool.ps1 -Action Add', '127.0.0.1:20808', '
 const rateLimit = read(join(docsDir, 'rate-limit.md'));
 for (const command of ['manage-rate-limit.sh add --apply', 'manage-rate-limit.sh test --name', 'manage-rate-limit.sh remove --name']) {
   if (!rateLimit.includes(command)) errors.push(`限速页缺少命令: ${command}`);
+}
+
+const exitNode = read(join(docsDir, 'exit-node.md'));
+const exitNodeRequiredFacts = [
+  'manage-exit-node.sh enable',
+  'manage-exit-node.sh enable --apply',
+  'manage-exit-node.sh status',
+  'manage-exit-node.sh test',
+  'manage-exit-node.sh disable --apply',
+  '0.0.0.0/0',
+  'Allow Default',
+  '移动数据',
+  '不需要开放公网 `10808/tcp`',
+  'Windows 默认不会因此全局走 VPN',
+  'https://api.ipify.org',
+  'https://api64.ipify.org',
+  'IPv4-only',
+  'Ubuntu 的公网出口 IP'
+];
+for (const fact of exitNodeRequiredFacts) {
+  if (!exitNode.includes(fact)) errors.push(`私有 Exit Node 页缺少关键事实: ${fact}`);
+}
+for (const consumer of [
+  { file: 'docs/proxy.md', content: read(join(docsDir, 'proxy.md')) },
+  { file: 'docs/proxy-public.md', content: read(join(docsDir, 'proxy-public.md')) },
+  { file: 'docs/verification.md', content: verification },
+  { file: 'docs/troubleshooting.md', content: read(join(docsDir, 'troubleshooting.md')) },
+  { file: 'docs/security.md', content: read(join(docsDir, 'security.md')) }
+]) {
+  if (!consumer.content.includes('exit-node.md')) errors.push(`${consumer.file}: 缺少私有 Exit Node 入口`);
+}
+const windowsTemplate = read(join(rootDir, 'templates', 'windows', 'zerotier-network.local.conf.tmpl'));
+if (!windowsTemplate.includes('allowDefault=0')) {
+  errors.push('Windows ZeroTier 模板必须保持 allowDefault=0，避免默认全局走 Exit Node');
 }
 
 const publishSite = read(join(docsDir, 'publish-site.md'));

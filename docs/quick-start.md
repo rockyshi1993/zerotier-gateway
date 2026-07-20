@@ -111,6 +111,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\scripts\windows\test-proxy.ps1
 ```
 
+Pixel/Android 在移动网络下想整机走 Ubuntu 出口时，不要把 `10808` 开到公网；基础安装成功后按[私有 Exit Node](exit-node.md)启用，Windows 默认不会因此全局走 VPN。
+
 ## 完成标准
 
 - 三台设备都已授权，且 ZeroTier IP 不冲突。

@@ -19,6 +19,7 @@ Ubuntu 节点通过 sing-box 提供私有 HTTP/SOCKS5 混合代理。
 | 在某个软件里手动填 `10.246.77.1:10808` | 只影响这个软件 | 由软件自己决定，本项目生成的排除规则不会自动生效 |
 | 使用 `artifacts/proxy.pac` | 只影响配置了这个 PAC 的浏览器、系统代理或软件 | 支持域名、域名后缀、IP 网段；不支持进程 |
 | 使用 `artifacts/windows-local-client.json` | 只影响导入并接管流量的本地规则客户端 | 支持域名、IP、进程；仅生成文件不会生效 |
+| 使用[私有 Exit Node](exit-node.md) | 只影响开启 Allow Default 的客户端整机流量 | 不是 HTTP/SOCKS 代理，不使用本页排除规则 |
 
 运行初始化或规则配置脚本只会更新本项目配置，不会自动修改 Windows 系统代理；只有软件、PAC 或本地规则客户端实际启用后才会接管流量。
 
@@ -98,6 +99,7 @@ localhost
 ## 其他代理任务
 
 - ZeroTier 私有入口慢，或客户端没有加入 ZeroTier：[公网代理：不经过 ZeroTier](proxy-public.md)。
+- Pixel/Android 移动网络整机走 Ubuntu 且不暴露公网代理：[私有 Exit Node](exit-node.md)。
 - 要部署多个地区并在客户端切换：[多台代理服务器](proxy-multi-server.md)。
 - 要让域名、IP 或进程直连：[代理排除规则](proxy-rules.md)。
 - 要让多个 Ubuntu 在一个本地入口后自动切换：[多台代理服务器](proxy-multi-server.md)。

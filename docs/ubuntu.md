@@ -4,6 +4,7 @@ Ubuntu 节点负责提供：
 
 - 加入 ZeroTier 私有网络。
 - 通过 sing-box 提供私有 HTTP/SOCKS5 代理。
+- 按需作为私有 IPv4 Exit Node，让手机移动网络通过 Ubuntu 出口。
 - 在直连质量较差时提供可选中转兜底。
 
 ## 常用命令
@@ -23,7 +24,17 @@ sudo bash scripts/ubuntu/health-check.sh
 
 默认代理入口是 `10.246.77.1:10808`，只供 ZeroTier 私有网络内访问。代理测速慢或客户端未加入 ZeroTier 时，按[公网代理](proxy-public.md)重新运行初始化脚本开启公网入口，不需要编辑配置文件。
 
-已有节点升级、按客户端限速和公网站点发布分别使用[安全升级](upgrade.md)、[按客户端限速](rate-limit.md)和[公网站点发布](publish-site.md)中的专项命令；它们默认关闭，不会随基础安装自动启用。
+已有节点升级、手机私有 Exit Node、按客户端限速和公网站点发布分别使用[安全升级](upgrade.md)、[私有 Exit Node](exit-node.md)、[按客户端限速](rate-limit.md)和[公网站点发布](publish-site.md)中的专项命令；它们默认关闭，不会随基础安装自动启用。
+
+手机移动网络整机走 Ubuntu 时，在仓库根目录执行：
+
+```bash
+sudo bash scripts/ubuntu/manage-exit-node.sh enable
+sudo bash scripts/ubuntu/manage-exit-node.sh enable --apply
+sudo bash scripts/ubuntu/manage-exit-node.sh status
+```
+
+这不会开放公网代理端口；还需要在 ZeroTier Central 添加默认路由，并只在需要的客户端开启 Allow Default。
 
 安装完成后使用[Ubuntu 安装成功验证](verification.md#1-ubuntu-安装成功)检查服务、网络和监听地址。
 

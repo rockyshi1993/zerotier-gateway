@@ -45,6 +45,7 @@ Windows 管理员权限、执行策略和角色命令见[Windows 客户端](wind
 |---|---|
 | 只做家里和公司远程 | 完成快速开始中的网络、Ubuntu 入网、两台 Windows 和远程验证；代理可以不用 |
 | 只让某台设备使用代理 | 该设备加入 ZeroTier 并获授权，软件填写 `10.246.77.1:10808`；不需要成为 Home/Work |
+| 让 Pixel/Android 移动网络整机走 Ubuntu 出口 | 先完成 Ubuntu 入网和基础验证，再按[私有 Exit Node](exit-node.md)启用；不需要开放公网代理端口 |
 | 只从一台电脑访问其他电脑 | 加入网络并获授权即可；只有“被访问”的 Windows 需要正确防火墙规则 |
 | 增加更多 Windows | 给每台设备分配不同的 `10.246.77.x`；不要复用 Home/Work 身份 |
 | 增加第二台 Ubuntu 中转 | 给新服务器独立 ZeroTier IP，再按[中转兜底](relay.md)规划端口 |
@@ -53,6 +54,7 @@ Windows 管理员权限、执行策略和角色命令见[Windows 客户端](wind
 
 - ZeroTier 网段使用 `10.246.77.0/24`。
 - 代理优先使用私有入口 `10.246.77.1:10808`。
+- 私有 Exit Node 默认关闭；只有在客户端允许默认路由时才全局走 Ubuntu 出口。
 - 代理账号密码可以不启用。
 - Windows 远程优先直连对方 ZeroTier IP。
 - TUN、代理公网入口、排除规则和中转都不是第一次成功的必选项。
@@ -61,6 +63,7 @@ Windows 管理员权限、执行策略和角色命令见[Windows 客户端](wind
 
 - 检查安装、互访、远程端口和代理出口：[安装与互访验证](verification.md)
 - 想用 v2rayN 或 PAC：[代理上网](proxy.md)
+- 手机移动网络要整机走 Ubuntu 且不暴露公网代理：[私有 Exit Node](exit-node.md)
 - 不经过 ZeroTier 直接使用服务器公网代理：[公网代理](proxy-public.md)
 - 部署多个地区并在客户端切换：[多台代理服务器](proxy-multi-server.md)
 - 正在使用旧版本并希望保持当前服务运行：[安全升级](upgrade.md)

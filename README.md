@@ -1,6 +1,6 @@
 # ZeroTier Gateway
 
-用现有脚本搭建 ZeroTier 私有远程访问、Ubuntu HTTP/SOCKS5 代理和可选中转。
+用现有脚本搭建 ZeroTier 私有远程访问、Ubuntu HTTP/SOCKS5 代理、手机私有 Exit Node 和可选中转。
 
 > 普通流程只需要运行脚本并按提示操作，不需要编辑脚本或手工填写整页参数。
 
@@ -12,6 +12,7 @@
 
 - 家里和公司两台 Windows 需要通过 ZeroTier 互相远程。
 - 浏览器或指定软件需要使用 Ubuntu 节点代理，但不想改成全局代理。
+- Pixel/Android 在移动网络下需要整机走 Ubuntu 出口，但不想暴露公网代理端口。
 - 需要排除指定域名、IP 或进程不走代理。
 - ZeroTier 直连长期不稳定，需要 Ubuntu 作为备用中转。
 - 有多台代理服务器，希望 Windows 只配置一个自动切换入口。
@@ -21,13 +22,15 @@
 
 | 设备 | 作用 | 推荐 ZeroTier IP |
 |---|---|---|
-| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选中转 | `10.246.77.1` |
+| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选 Exit Node/中转 | `10.246.77.1` |
 | 家里 Windows | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
 | 公司 Windows | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
 远程工具填写对方 Windows 的 ZeroTier IP。代理默认填写 `10.246.77.1:10808`。
 
 > 加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。只有主动配置代理的软件才会走 Ubuntu 出口。
+
+> 手机移动网络要整机走 Ubuntu 出口时，不推荐暴露公网代理端口；请按[私有 Exit Node](docs/exit-node.md)逐台开启默认路由。
 
 ## 开始前准备
 
@@ -90,6 +93,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 | 分别配置 Ubuntu 或 Windows | [Ubuntu 节点](docs/ubuntu.md) · [Windows 客户端](docs/windows.md) |
 | 公司访问家里或家里访问公司 | [远程访问](docs/remote.md) |
 | 给浏览器、v2rayN 或指定软件配置代理 | [代理上网](docs/proxy.md) |
+| Pixel/Android 移动网络整机走 Ubuntu 出口 | [私有 Exit Node](docs/exit-node.md) |
 | 不经过 ZeroTier，直接使用公网代理 | [公网代理](docs/proxy-public.md) |
 | 添加多台代理服务器并切换 | [多台代理服务器](docs/proxy-multi-server.md) |
 | 排除域名、IP 或进程 | [代理排除规则](docs/proxy-rules.md) |
@@ -112,6 +116,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 没有配置代理的软件继续使用本机网络。公网代理入口、认证、PAC、进程排除和 TUN 使用判断都属于进阶场景，请看[代理上网](docs/proxy.md)。
 
+Pixel/Android 没有 Wi‑Fi 时想整机走 Ubuntu，走[私有 Exit Node](docs/exit-node.md)：Ubuntu 执行 `manage-exit-node.sh enable --apply`，ZeroTier Central 添加 `0.0.0.0/0 via 10.246.77.1`，只在手机上开启 Allow Default。Windows 默认不会因此全局走 VPN。
+
 多台 Ubuntu 自动切换时，软件日常只使用 `127.0.0.1:20808`；公网访问本地站点使用独立发布命令，不要把 SOCKS 代理端口当作 Web 站点入口。
 
 ## 成功标准
@@ -121,6 +127,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 - 两台 Windows 的 `test-network.ps1` 没有关键失败。
 - 远程工具使用对方 ZeroTier IP 可以连接。
 - 需要代理的软件能通过 `10.246.77.1:10808` 上网。
+- 如果启用私有 Exit Node，Pixel 移动数据访问 `https://api.ipify.org` 显示 Ubuntu 出口 IP，并单独检查 `https://api64.ipify.org` 的 IPv6 边界。
 
 这些结论不能只凭脚本“没有报错”判断。请按[安装与互访验证](docs/verification.md)运行服务、双向 ping、3389、实际远程登录和代理出口命令。
 
@@ -147,6 +154,7 @@ Windows：
 - [文档首页](docs/index.md)
 - [安装总览](docs/install.md)
 - [安装与互访验证](docs/verification.md)
+- [手机移动网络私有 Exit Node](docs/exit-node.md)
 - [安全说明](docs/security.md)
 - [发布验证（维护者）](docs/release.md)
 

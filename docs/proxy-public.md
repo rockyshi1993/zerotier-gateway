@@ -2,6 +2,8 @@
 
 这个任务适合两种情况：设备没有加入 ZeroTier，或设备到 Ubuntu 的 ZeroTier 路径明显慢于公网直连。它只改变代理入口，远程访问仍优先使用 Windows 的 ZeroTier IP。
 
+如果你的目标是 Pixel/Android 在移动网络下使用 Ubuntu 出口，同时不暴露服务器公网代理端口，请优先看[私有 Exit Node](exit-node.md)。公网代理需要开放 `10808/tcp`，和“只经 ZeroTier 私有入口”不是同一条路径。
+
 ## 1. 在 Ubuntu 开启公网入口
 
 在 Ubuntu 仓库根目录重新运行初始化脚本：

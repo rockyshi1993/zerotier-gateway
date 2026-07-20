@@ -21,6 +21,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 ```bash
 sudo bash scripts/ubuntu/manage-rate-limit.sh disable --name <规则名> --apply
 sudo bash scripts/ubuntu/manage-rate-limit.sh remove --name <规则名> --apply
+sudo bash scripts/ubuntu/manage-exit-node.sh disable --apply
 sudo bash scripts/ubuntu/manage-publish.sh remove --name <映射名> --apply
 sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name <域名映射名> --apply
 ```

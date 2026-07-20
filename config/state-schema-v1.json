@@ -17,7 +17,7 @@
     "objectVersion": { "type": "integer", "minimum": 1 },
     "owner": { "const": "zerotier-gateway" },
     "objectType": {
-      "enum": ["installation", "proxy-node", "proxy-pool", "rate-limit", "publish-ip", "publish-domain", "publish-firewall"]
+      "enum": ["installation", "proxy-node", "proxy-pool", "rate-limit", "publish-ip", "publish-domain", "publish-firewall", "exit-node"]
     },
     "objectName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
     "enabled": { "type": "boolean" },

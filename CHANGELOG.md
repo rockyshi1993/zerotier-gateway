@@ -8,6 +8,7 @@
 - 新增 no-restart 管理升级命令：识别既有安装形态、备份项目状态并校验运行态不变量；新能力升级后保持关闭。
 - 新增 Windows 多代理节点池和稳定本地 mixed 入口 `127.0.0.1:20808`，支持真实 SOCKS 出口健康检查、故障自动切换与全挂 fail-closed。
 - 新增 Ubuntu 按客户端 IP 与代理端口的精确 tc 限速，以及公网 IP+端口映射、项目专属 Caddy 域名自动 HTTPS。
+- 新增 Ubuntu 私有 IPv4 Exit Node 管理命令，让 Pixel/Android 移动网络可按客户端 Allow Default 经 Ubuntu 出口，同时不开放公网代理端口。
 - 新增安全升级、按客户端限速、公网站点发布任务页，并补齐自动切换、失败恢复、删除和真实环境验收步骤。
 - 新增 Rspress 用户文档站、GitHub Pages 工作流和“安装与互访验证”页面，按 Ubuntu 服务、三节点入网、双向访问、RDP、代理出口和中转逐层验收。
 - 新增 `enable-remote-desktop.ps1`，检查 Windows 版本并以预览/应用两阶段启用 RDP 主机和网络级别身份验证。

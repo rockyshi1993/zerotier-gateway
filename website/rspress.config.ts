@@ -24,6 +24,7 @@ const userSidebar = [
     items: [
       { text: '远程访问', link: '/remote' },
       { text: '代理上网', link: '/proxy' },
+      { text: '手机私有 Exit Node', link: '/exit-node' },
       { text: '公网代理', link: '/proxy-public' },
       { text: '多台代理服务器', link: '/proxy-multi-server' },
       { text: '代理排除规则', link: '/proxy-rules' },
@@ -67,6 +68,7 @@ export default defineConfig({
       { text: '验证', link: '/verification' },
       { text: '远程访问', link: '/remote' },
       { text: '代理上网', link: '/proxy' },
+      { text: '手机 Exit Node', link: '/exit-node' },
       { text: '公网站点', link: '/publish-site' },
       { text: '故障排查', link: '/troubleshooting' },
       { text: '维护者', link: '/release' }

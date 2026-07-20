@@ -1,0 +1,13 @@
+# Managed-By: zerotier-gateway-exit-node
+[Unit]
+Description=Restore ZeroTier Gateway private Exit Node rules
+After=network-online.target zerotier-one.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash "{{EXIT_NODE_MANAGER_PATH}}" restore --apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

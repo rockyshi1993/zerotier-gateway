@@ -112,6 +112,22 @@ sudo systemctl status zerotier-gateway-rate-limit.service
 
 如果 RDP、relay 或未限速客户端也变慢，先执行 `disable --name <规则名> --apply`。不要运行 `tc qdisc del` 或全局 filter flush；项目删除命令只处理有 state 与稳定 handle 的规则。
 
+## 手机 Exit Node 没有接管移动网络
+
+先在 Ubuntu 看项目状态：
+
+```bash
+sudo bash scripts/ubuntu/manage-exit-node.sh status
+sudo bash scripts/ubuntu/manage-exit-node.sh test
+```
+
+- `rule.*=missing`：执行 `sudo bash scripts/ubuntu/manage-exit-node.sh restore --apply`，或先 `disable --apply` 再重新启用。
+- Pixel 仍显示运营商 IPv4：检查 ZeroTier Central 是否有 `0.0.0.0/0 via 10.246.77.1`，以及 Pixel 是否对该网络开启 Allow Default / Allow Default Route。
+- Windows 也全局走 VPN：检查那台 Windows 的 ZeroTier 客户端是否开启了 Allow Default；项目默认不会替 Windows 打开它。
+- IPv4 出口正确但 `https://api64.ipify.org` 显示运营商 IPv6：当前 Exit Node 首期是 IPv4-only，需要严格 IPv6 时要另开需求。
+
+手机移动网络且不想暴露公网代理端口时，不要按公网代理路径开放 `10808/tcp`；应按[私有 Exit Node](exit-node.md)处理。
+
 ## 公网端口或域名外部不可访问
 
 先分层，不要直接重装：

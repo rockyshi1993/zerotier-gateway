@@ -33,6 +33,9 @@ features:
   - title: 公网站点发布
     details: 使用公网 IP+端口或显式域名 HTTPS 访问 ZT 内服务。
     link: /publish-site.html
+  - title: 手机私有 Exit Node
+    details: Pixel 移动网络下整机经 Ubuntu 出口，不开放公网代理端口。
+    link: /exit-node.html
 ---
 
 ## 先选择你要完成的任务
@@ -43,6 +46,7 @@ features:
 | 检查是否安装成功、互相访问是否正常 | [安装与互访验证](verification.md) |
 | 只想让家里和公司互相远程 | [远程访问](remote.md) |
 | 只想给浏览器或指定软件配置代理 | [代理上网](proxy.md) |
+| 手机移动网络也要通过 Ubuntu 出口 | [私有 Exit Node](exit-node.md) |
 | 不加入 ZeroTier，直接使用公网代理 | [公网代理](proxy-public.md) |
 | 添加多台代理服务器并切换 | [多台代理服务器](proxy-multi-server.md) |
 | 需要排除域名、IP 或进程 | [代理排除规则](proxy-rules.md) |
@@ -56,16 +60,17 @@ features:
 
 | 设备 | 作用 | 推荐 ZeroTier IP |
 |---|---|---|
-| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选 TCP 中转 | `10.246.77.1` |
+| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选 Exit Node/TCP 中转 | `10.246.77.1` |
 | 家里 Windows | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
 | 公司 Windows | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
 
-加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。需要代理的软件还要主动填写 `10.246.77.1:10808`，或使用 PAC/本地规则客户端。
+加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。需要代理的软件还要主动填写 `10.246.77.1:10808`，或使用 PAC/本地规则客户端；需要手机移动网络整机走 Ubuntu 时，按[私有 Exit Node](exit-node.md)逐台开启默认路由。
 
 ## 使用边界
 
 - 远程优先连接对方 Windows 的 ZeroTier IP，延迟最低。
 - 代理默认只监听 ZeroTier 私有入口；公网入口是可选高级功能。
+- 私有 Exit Node 默认关闭，只影响开启 Allow Default 的客户端。
 - 中转只在直连长期不稳定时启用，不是默认路径。
 - 不要把 Windows 远程端口直接暴露到公网。
 - 公网站点发布只开放明确目标，不等于公开整个 ZeroTier 网络。

@@ -10,6 +10,18 @@
 - 远程控制端口不要暴露到公网。
 - `.env` 不要提交到仓库。
 
+## 私有 Exit Node
+
+[私有 Exit Node](exit-node.md)适合手机移动网络整机走 Ubuntu 出口，同时不开放公网 `10808/tcp`。
+
+安全边界：
+
+- Ubuntu 只允许 ZeroTier 网段经项目 NAT/forward 规则转发。
+- ZeroTier Central 的默认路由不会强制所有设备接管流量；客户端还必须自己开启 Allow Default。
+- Windows 默认不启用 Allow Default，因此不会因为手机 Exit Node 自动全局走 VPN。
+- 外网站点看到的出口 IP 仍是 Ubuntu 公网出口 IP；“私有”指入口路径不暴露公网代理端口。
+- 首期只覆盖 IPv4；必须用 `https://api64.ipify.org` 单独检查 IPv6 是否绕行。
+
 ## 默认私有入口
 
 默认代理入口只供 ZeroTier 私有网络内访问：
