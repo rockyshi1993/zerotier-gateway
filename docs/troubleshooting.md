@@ -266,6 +266,21 @@ sudo bash scripts/ubuntu/install.sh
 
 `scripts/ubuntu/install-proxy.sh` 是单独修代理时用的子脚本；主流程不需要直接运行它。
 
+如果 `zerotier-cli listnetworks` 显示 `ACCESS_DENIED`，说明 Ubuntu 节点还没有在 ZeroTier Central 授权，或没有分配计划中的 `10.246.77.1`。先在 Central 授权该节点并设置 Managed IP，再回到 Ubuntu 执行：
+
+```bash
+sudo systemctl restart sing-box-zt-proxy
+sudo systemctl status sing-box-zt-proxy --no-pager
+sudo ss -lntp | grep ':10808'
+sudo bash scripts/ubuntu/health-check.sh
+```
+
+通过标准是 `sing-box-zt-proxy` 为 `active`，并且 `ss` 能看到 `10.246.77.1:10808`。如果服务仍失败，再查看：
+
+```bash
+sudo journalctl -u sing-box-zt-proxy -n 80 --no-pager
+```
+
 如果安装时看到：
 
 ```text

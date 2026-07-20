@@ -26,6 +26,17 @@ sudo ss -lntp | grep ':10808'
 
 失败时：服务不存在就重新运行 `sudo bash scripts/ubuntu/install.sh`；网络显示 `ACCESS_DENIED` 就回到 ZeroTier Central 授权该节点；地址不是计划值就先修正 Central 的 Managed IP。
 
+如果刚在 ZeroTier Central 授权 Ubuntu 节点，或刚把 Managed IP 修正为 `10.246.77.1`，回到 Ubuntu 执行：
+
+```bash
+sudo systemctl restart sing-box-zt-proxy
+sudo systemctl status sing-box-zt-proxy --no-pager
+sudo ss -lntp | grep ':10808'
+sudo bash scripts/ubuntu/health-check.sh
+```
+
+这一步确认代理服务已经用新的 ZeroTier 地址重新监听。`install.sh --dry-run` 只预览计划，不会修复授权或重启服务。
+
 ## 2. 三台设备都已加入 ZeroTier
 
 家里和公司电脑分别在管理员 PowerShell 中执行：
