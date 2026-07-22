@@ -10,6 +10,18 @@
 - 远程控制端口不要暴露到公网。
 - `.env` 不要提交到仓库。
 
+## 功能边界速查
+
+| 功能 | 默认暴露面 | 会修改什么 | 主要风险 |
+|---|---|---|---|
+| 私有代理 | 只监听 Ubuntu 的 ZeroTier IP | sing-box 服务与项目配置 | ZeroTier 网络内不可信设备可访问代理 |
+| 公网代理 | 可选监听 `0.0.0.0:10808` | sing-box 监听与防火墙计划 | 来源限制或认证为空时，公网来源都可能尝试连接 |
+| 私有 Exit Node | 不开放公网代理端口 | IPv4 forwarding、NAT/forward 规则和恢复服务 | 开启 Allow Default 的客户端整机流量改走 Ubuntu，IPv6 需单独验证 |
+| 中转兜底 | 只监听 Ubuntu ZeroTier IP 的中转端口 | systemd socket/service 和目标 Windows 防火墙来源 | 远程流量绕经 Ubuntu，延迟和可用性依赖中转节点 |
+| 按客户端限速 | 不新增公网入口 | `tc` filter 与恢复服务 | 客户端 IP/CIDR 选错会限错对象 |
+| 公网站点发布 | 明确公网端口或域名 | 项目 systemd unit、UFW 规则或项目 Caddy | 公开目标应用自身漏洞、弱认证或管理后台 |
+| 多台代理自动切换 | Windows 本地 `127.0.0.1:20808` | 当前用户计划任务、runtime 文件和本地 sing-box | 所有节点故障时新连接失败，不会自动直连兜底 |
+
 ## 私有 Exit Node
 
 [私有 Exit Node](exit-node.md)适合手机移动网络整机走 Ubuntu 出口，同时不开放公网 `10808/tcp`。

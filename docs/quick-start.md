@@ -2,6 +2,8 @@
 
 这条路径只使用项目现有脚本。你无需接触 `.env`、修改脚本或理解全部参数；初始化脚本会逐项询问必要信息。
 
+这里的 5 分钟指脚本路径本身；软件下载、ZeroTier Central 授权等待和远程工具账号调试可能需要额外时间。
+
 ## 1. 准备 ZeroTier 网络
 
 1. 在 [ZeroTier Central](https://my.zerotier.com) 创建一个私有网络。

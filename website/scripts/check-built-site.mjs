@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const websiteDir = resolve(import.meta.dirname, '..');
@@ -26,6 +26,18 @@ if (!existsSync(indexPath)) {
     if (!existsSync(join(distDir, `${route}.html`))) errors.push(`首页任务没有生成静态目标: ${route}.html`);
   }
   if (!html.includes('site-accessibility.js')) errors.push('生成首页没有加载无障碍增强脚本');
+}
+
+if (existsSync(distDir)) {
+  for (const name of readdirSync(distDir).filter((file) => file.endsWith('.html') && file !== '404.html')) {
+    const html = readFileSync(join(distDir, name), 'utf8');
+    if (!/<script src="\.\/site-accessibility\.js" defer>\s*<\/script>/.test(html)) {
+      errors.push(`生成页面无障碍脚本标签未正确闭合: ${name}`);
+    }
+    if (html.includes('<script src="./site-accessibility.js" defer>\n  <script>')) {
+      errors.push(`生成页面无障碍脚本吞入后续脚本: ${name}`);
+    }
+  }
 }
 
 if (errors.length > 0) {

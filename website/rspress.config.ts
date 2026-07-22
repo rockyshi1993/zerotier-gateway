@@ -5,7 +5,6 @@ const userSidebar = [
   {
     text: '开始使用',
     items: [
-      { text: '文档首页', link: '/' },
       { text: '5 分钟快速开始', link: '/quick-start' },
       { text: '安装与互访验证', link: '/verification' },
       { text: '安装总览', link: '/install' },
@@ -51,7 +50,7 @@ export default defineConfig({
   title: 'ZeroTier Gateway',
   description: '通过脚本搭建 ZeroTier 私有远程访问、HTTP/SOCKS5 代理与可选中转。',
   icon: '/favicon.svg',
-  head: [['script', { src: './site-accessibility.js', defer: '' }]],
+  head: ['<script src="./site-accessibility.js" defer></script>'],
   globalStyles: path.join(__dirname, 'styles', 'index.css'),
   markdown: {
     link: {
@@ -68,10 +67,7 @@ export default defineConfig({
       { text: '验证', link: '/verification' },
       { text: '远程访问', link: '/remote' },
       { text: '代理上网', link: '/proxy' },
-      { text: '手机 Exit Node', link: '/exit-node' },
-      { text: '公网站点', link: '/publish-site' },
-      { text: '故障排查', link: '/troubleshooting' },
-      { text: '维护者', link: '/release' }
+      { text: '故障排查', link: '/troubleshooting' }
     ],
     sidebar: {
       '/': userSidebar

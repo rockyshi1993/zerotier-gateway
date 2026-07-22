@@ -15,9 +15,75 @@
 | 公司访问家里 | `10.246.77.1:443` | `10.246.77.10:3389` |
 | 家里访问公司 | `10.246.77.1:444` | `10.246.77.20:3389` |
 
-当前脚本默认使用 `443/444 → 3389`；普通使用无需理解或修改这些参数。
+当前脚本默认使用 `443/444 -> 3389`；普通使用无需理解或修改这些参数。
 
 被中转访问的 Windows 必须允许当前 Ubuntu 中转服务器访问远程端口。Windows 初始化时选定 Ubuntu 地址后，`setup.ps1 -Role Home|Work -ApplyFirewall` 会自动写入对应规则。默认第一台中转服务器是 `10.246.77.1`，所以普通首次流程不需要额外手动加防火墙规则。
+
+## 启用并验证默认中转
+
+在 Ubuntu 仓库根目录先预览：
+
+```bash
+sudo bash scripts/ubuntu/install-relay.sh --dry-run
+```
+
+确认预览里的方向正确后安装：
+
+```bash
+sudo bash scripts/ubuntu/install-relay.sh
+```
+
+安装后检查：
+
+```bash
+systemctl is-active zerotier-gateway-relay-home-3389.socket
+systemctl is-active zerotier-gateway-relay-work-3389.socket
+systemctl status zerotier-gateway-relay-home-3389.socket
+systemctl status zerotier-gateway-relay-work-3389.socket
+ss -lntp | grep -E '10.246.77.1:(443|444)'
+```
+
+成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。
+
+从两台 Windows 测中转入口：
+
+```powershell
+# 公司电脑：访问家里电脑的中转入口
+Test-NetConnection 10.246.77.1 -Port 443
+
+# 家里电脑：访问公司电脑的中转入口
+Test-NetConnection 10.246.77.1 -Port 444
+```
+
+成功时应看到：
+
+```text
+TcpTestSucceeded : True
+```
+
+再从 Ubuntu 测目标 Windows 远程端口：
+
+```bash
+nc -vz 10.246.77.10 3389
+nc -vz 10.246.77.20 3389
+```
+
+如果没有 `nc` 或看到 `nc: command not found`：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y netcat-openbsd
+```
+
+安装后再执行 `nc -vz`。如果命令能运行但连接失败，优先回到目标 Windows，重新运行初始化脚本选择当前中转服务器，再执行 `setup.ps1 -ApplyFirewall`。
+
+如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
+
+```bash
+sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
+sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
+sudo ufw status
+```
 
 ## 多台中转服务器
 
@@ -75,13 +141,7 @@ Test-NetConnection 10.246.77.2 -Port 443
 Test-NetConnection 10.246.77.2 -Port 444
 ```
 
-不用的旧中转可以停用：
-
-```bash
-sudo bash scripts/ubuntu/disable-relay.sh
-```
-
-停用旧服务器不会影响新服务器，也不会影响 ZeroTier 本身。
+不用的旧中转可以停用。停用旧服务器不会影响新服务器，也不会影响 ZeroTier 本身。
 
 ## 很多台 Windows 电脑
 
@@ -91,71 +151,7 @@ sudo bash scripts/ubuntu/disable-relay.sh
 
 其他 Windows 如果也要被远程访问，优先使用它自己的 ZeroTier IP 直连；如果确实要经过中转，需要单独规划目标 IP 和中转端口，避免多个目标共用同一个入口端口。
 
-先预览：
-
-```bash
-sudo bash scripts/ubuntu/install-relay.sh --dry-run
-```
-
-确认预览里的方向正确后安装：
-
-```bash
-sudo bash scripts/ubuntu/install-relay.sh
-```
-
-安装后检查：
-
-```bash
-systemctl is-active zerotier-gateway-relay-home-3389.socket
-systemctl is-active zerotier-gateway-relay-work-3389.socket
-systemctl status zerotier-gateway-relay-home-3389.socket
-systemctl status zerotier-gateway-relay-work-3389.socket
-ss -lntp | grep -E '10.246.77.1:(443|444)'
-```
-
-成功时应看到两个 `active`，并且 `ss` 输出里有 `10.246.77.1:443` 和 `10.246.77.1:444`。
-
-从两台 Windows 测中转入口：
-
-```powershell
-# 公司电脑：访问家里电脑的中转入口
-Test-NetConnection 10.246.77.1 -Port 443
-
-# 家里电脑：访问公司电脑的中转入口
-Test-NetConnection 10.246.77.1 -Port 444
-```
-
-成功时应看到：
-
-```text
-TcpTestSucceeded : True
-```
-
-再从 Ubuntu 测目标 Windows 远程端口：
-
-```bash
-nc -vz 10.246.77.10 3389
-nc -vz 10.246.77.20 3389
-```
-
-如果没有 `nc` 或看到 `nc: command not found`：
-
-```bash
-sudo apt-get update
-sudo apt-get install -y netcat-openbsd
-```
-
-安装后再执行 `nc -vz`。如果命令能运行但连接失败，优先回到目标 Windows，重新运行初始化脚本选择当前中转服务器，再执行 `setup.ps1 -ApplyFirewall`。第一台中转服务器通常是 `10.246.77.1`；切换到新服务器时可能是 `10.246.77.2`。
-
-如果 Windows 到 Ubuntu 的 `Test-NetConnection` 失败，先确认发起端 Windows、目标 Windows 和当前中转 Ubuntu 都在同一个 ZeroTier 网络；如果 Ubuntu 开了 `ufw`，放行 ZeroTier 网段访问中转端口：
-
-```bash
-sudo ufw allow from 10.246.77.0/24 to any port 443 proto tcp comment ztg-relay-home
-sudo ufw allow from 10.246.77.0/24 to any port 444 proto tcp comment ztg-relay-work
-sudo ufw status
-```
-
-停用：
+## 停用中转
 
 ```bash
 sudo bash scripts/ubuntu/disable-relay.sh

@@ -321,3 +321,16 @@ sudo bash scripts/ubuntu/install-proxy.sh
 .\scripts\windows\show-diagnostics.ps1 -FindProcess "远程"
 .\scripts\windows\show-diagnostics.ps1 -FindProcessPath "C:\Program Files\远程工具"
 ```
+
+确认实际进程名或路径后，重新生成本地规则客户端配置：
+
+```powershell
+.\scripts\windows\configure-proxy-rules.ps1 `
+  -DirectProcessNames 'mstsc.exe,RemoteTool.exe' `
+  -DirectProcessPaths 'C:\Program Files\RemoteTool\RemoteTool.exe' `
+  -Generate
+sing-box check -c .\artifacts\windows-local-client.json
+sing-box run -c .\artifacts\windows-local-client.json
+```
+
+把示例值换成现场查到的名称或路径。多进程软件还要把服务进程、辅助进程和更新进程一并加入；只改主程序名后仍不命中时，继续用 `show-diagnostics.ps1 -FindProcess` 观察实际发起连接的进程。
