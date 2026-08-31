@@ -76,7 +76,7 @@ zerotier-cli peers
 Get-NetRoute -AddressFamily IPv4 | Where-Object DestinationPrefix -eq '10.246.77.0/24'
 ```
 
-如果开启了 TUN、全局代理或加速器，请先按[代理排除规则](proxy-rules.md)让 ZeroTier 网段和远程工具直连，再重测。
+如果开启了 TUN、全局代理或加速器，请先按[代理排除规则](proxy-rules.md)让 ZeroTier 网段和远程工具直连，再重测。搬家、换宽带或恢复路由器默认设置后，如果连接长期显示 `RELAY` 且延迟很高，按[搬家、换宽带后延迟很高或显示 RELAY](troubleshooting.md#搬家换宽带后延迟很高或显示-relay)排查 UDP 映射和运营商 CGNAT。
 
 ## 4. Windows 远程主机已开启
 

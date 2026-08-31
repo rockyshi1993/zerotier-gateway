@@ -144,6 +144,56 @@ sudo ss -lntp
 - 域名 DNS 不正确：先修正 A 记录；Caddy不会伪造证书成功。
 - 80/443 被占用：项目会停止，不接管第三方 Caddy/nginx/Apache；选择现有反向代理集成需要另行规划。
 
+## 搬家、换宽带后延迟很高或显示 RELAY
+
+如果以前远程访问很流畅，搬家、迁移宽带或把路由器恢复默认后突然变慢，先不要重装 ZeroTier。常见原因是路由器原有的 UDP 映射被清空，或新宽带改为运营商 CGNAT，导致两台设备无法建立 P2P 直连，只能经过 ZeroTier 中继。
+
+先在两端 Windows 的管理员 PowerShell 中执行：
+
+```powershell
+zerotier-cli peers
+ping -n 20 <对端 ZeroTier IP>
+```
+
+`peers` 中与对端相关的连接如果显示 `DIRECT`，说明已直连；若长期显示 `RELAY`，且 ping 延迟明显升高，说明正在走中继。先确认没有 TUN、全局代理或加速器接管 ZeroTier 流量；处理方式见[开启 TUN 或全局代理后远程不通](#开启-tun-或全局代理后远程不通)。
+
+### 1. 恢复路由器的 UDP 映射
+
+只在家里这台 Windows 需要作为 ZeroTier 节点时配置。先确认它当前的局域网 IPv4：
+
+```powershell
+ipconfig
+```
+
+在路由器的“端口映射”或“虚拟服务器”页面添加一条规则：
+
+| 字段 | 填写值 |
+|---|---|
+| 服务名称 | `ZeroTier-UDP-9993` |
+| 局域网 IP | 这台 Windows 的当前局域网 IPv4，例如 `192.168.1.131` |
+| 协议 | **UDP** |
+| 内部端口 | `9993` |
+| 外部端口 | `9993` |
+
+不要使用页面默认的 TCP，也不要把随机高端口手工固定映射。ZeroTier 会维护其他辅助 UDP 端口；手工映射只恢复稳定的 UDP `9993` 入口。路由器重置后，局域网 IP 可能变化；如果 Windows 没有 DHCP 保留地址，后续应检查这条规则仍指向正确的设备。
+
+### 2. 判断是否处于运营商 CGNAT
+
+在路由器的“网关信息”或“WAN 信息”中查看 WAN IPv4：
+
+- 如果 WAN 地址位于 `100.64.0.0/10`，例如 `100.64.x.x`，通常表示运营商 CGNAT；
+- 此时本地端口映射只能到达自家路由器，**无法穿透运营商上游 NAT**，仍可能保持 `RELAY`；
+- 联系宽带运营商，说明“需要公网 IPv4 或取消 CGNAT，用于 ZeroTier 的 UDP P2P 直连”。
+
+拿到公网 IPv4 后，确认 UDP `9993` 映射仍指向当前 Windows 局域网 IP，再重新执行：
+
+```powershell
+zerotier-cli peers
+ping -n 20 <对端 ZeroTier IP>
+```
+
+预期是连接由 `RELAY` 变为 `DIRECT`，并且延迟明显下降。若已具备公网 IPv4、UDP 映射正确且仍无法长期直连，可以按[中转兜底](relay.md)使用 Ubuntu TCP 中转；中转不需要家里宽带有公网 IPv4，但只作为直连无法恢复时的后备方案。
+
 ## ZeroTier 无法连通
 
 检查：
