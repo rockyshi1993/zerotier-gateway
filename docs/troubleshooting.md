@@ -157,6 +157,20 @@ ping -n 20 <对端 ZeroTier IP>
 
 `peers` 中与对端相关的连接如果显示 `DIRECT`，说明已直连；若长期显示 `RELAY`，且 ping 延迟明显升高，说明正在走中继。先确认没有 TUN、全局代理或加速器接管 ZeroTier 流量；处理方式见[开启 TUN 或全局代理后远程不通](#开启-tun-或全局代理后远程不通)。
 
+### 0. Ubuntu 节点放行 ZeroTier UDP 9993
+
+Ubuntu 节点如果开着 `ufw` 且默认拒绝入站，ZeroTier 的 UDP `9993` 进不来，手机或其他对端可能打洞失败，退回 `RELAY` 中继，延迟高、抖动大、速度慢（2026-10-26 在东京出口实测：Pixel 到东京显示 `RELAY`，而服务器本身带宽正常）。可选放行，默认关闭，不影响已部署的机器：
+
+```bash
+# 二选一：.env 中设置 ZEROTIER_ALLOW_UDP_INBOUND=true，或安装时加参数
+sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp --dry-run   # 先预览
+sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp
+# 已部署的机器也可以只加这一条（ufw 会同时加 IPv4/IPv6，重复执行会跳过）
+sudo ufw allow 9993/udp comment 'zerotier'
+```
+
+之后再看 `zerotier-cli peers`，对端应变为 `DIRECT`。云厂商防火墙组如果挂在这台机器上，也要放行入站 UDP `9993`。撤回：`sudo ufw delete allow 9993/udp`。
+
 ### 1. 恢复路由器的 UDP 映射
 
 只在家里这台 Windows 需要作为 ZeroTier 节点时配置。先确认它当前的局域网 IPv4：

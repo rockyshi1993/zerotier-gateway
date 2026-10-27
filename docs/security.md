@@ -15,6 +15,7 @@
 | 功能 | 默认暴露面 | 会修改什么 | 主要风险 |
 |---|---|---|---|
 | 私有代理 | 只监听 Ubuntu 的 ZeroTier IP | sing-box 服务与项目配置 | ZeroTier 网络内不可信设备可访问代理 |
+| ZeroTier UDP 9993 | 可选放行入站 `9993/udp`，默认关闭（`ZEROTIER_ALLOW_UDP_INBOUND` / `--allow-zerotier-udp`） | `install-proxy.sh` 的 ufw 规则，备注 `zerotier` | 只开放 ZeroTier 协议端口，不暴露代理；不放行时对端可能只能走 RELAY |
 | 公网代理 | 可选监听 `0.0.0.0:10808` | sing-box 监听与防火墙计划 | 来源限制或认证为空时，公网来源都可能尝试连接 |
 | 私有 Exit Node | 不开放公网代理端口 | IPv4 forwarding、NAT/forward 规则和恢复服务 | 开启 Allow Default 的客户端整机流量改走 Ubuntu，IPv6 需单独验证 |
 | 中转兜底 | 只监听 Ubuntu ZeroTier IP 的中转端口 | systemd socket/service 和目标 Windows 防火墙来源 | 远程流量绕经 Ubuntu，延迟和可用性依赖中转节点 |

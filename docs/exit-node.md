@@ -39,6 +39,20 @@ sudo bash scripts/ubuntu/manage-exit-node.sh enable --ubuntu-zt-ip 10.246.77.2 -
 
 仍然先预览；确认后再追加 `--apply`。
 
+### 手机到出口显示 RELAY 时
+
+Ubuntu 节点如果开着 `ufw` 且默认拒绝入站，ZeroTier 的 UDP `9993` 进不来，手机或其他对端可能打洞失败，退回 `RELAY` 中继，延迟高、抖动大、速度慢（2026-10-26 在东京出口实测：Pixel 到东京显示 `RELAY`，而服务器本身带宽正常）。可选放行，默认关闭，不影响已部署的机器：
+
+```bash
+# 二选一：.env 中设置 ZEROTIER_ALLOW_UDP_INBOUND=true，或安装时加参数
+sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp --dry-run   # 先预览
+sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp
+# 已部署的机器也可以只加这一条（ufw 会同时加 IPv4/IPv6，重复执行会跳过）
+sudo ufw allow 9993/udp comment 'zerotier'
+```
+
+之后再看 `zerotier-cli peers`，对端应变为 `DIRECT`。云厂商防火墙组如果挂在这台机器上，也要放行入站 UDP `9993`。撤回：`sudo ufw delete allow 9993/udp`。
+
 ## 2. ZeroTier Central 添加默认路由
 
 到 ZeroTier Central 的网络页面，在 Managed Routes 增加：

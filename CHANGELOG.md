@@ -5,6 +5,7 @@
 ## [未发布]
 
 ### 新增
+- 新增可选的 ZeroTier 入站 UDP 9993 放行：`install-proxy.sh --allow-zerotier-udp` 或 `ZEROTIER_ALLOW_UDP_INBOUND=true`，在 ufw 添加 `9993/udp`（备注 `zerotier`），帮助对端建立 DIRECT 直连；默认关闭，现有部署不受影响。
 - 新增 no-restart 管理升级命令：识别既有安装形态、备份项目状态并校验运行态不变量；新能力升级后保持关闭。
 - 新增 Windows 多代理节点池和稳定本地 mixed 入口 `127.0.0.1:20808`，支持真实 SOCKS 出口健康检查、故障自动切换与全挂 fail-closed。
 - 新增 Ubuntu 按客户端 IP 与代理端口的精确 tc 限速，以及公网 IP+端口映射、项目专属 Caddy 域名自动 HTTPS。

@@ -101,6 +101,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 | 给指定代理客户端限制速度 | [按客户端限速](docs/rate-limit.md) |
 | 通过公网 IP+端口或域名访问站点 | [公网站点发布](docs/publish-site.md) |
 | 直连不稳定时启用中转 | [中转兜底](docs/relay.md) |
+| 手机/对端到 Ubuntu 显示 RELAY、出口很慢 | [放行 ZeroTier UDP 9993](docs/troubleshooting.md#0-ubuntu-节点放行-zerotier-udp-9993)（`install-proxy.sh --allow-zerotier-udp`，默认关闭） |
 | 安装失败、权限报错或连不通 | [故障排查](docs/troubleshooting.md) |
 | 卸载或恢复 | [回滚与卸载](docs/rollback.md) |
 

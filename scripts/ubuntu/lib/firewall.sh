@@ -38,3 +38,20 @@ ztg_apply_firewall_proxy() {
     ztg_log_warn "ufw not found. Apply equivalent firewall rule manually if needed."
   fi
 }
+
+# Opt-in: allow ZeroTier's UDP 9993 inbound so peers can establish DIRECT paths.
+# Without it, a default-deny ufw can force phone/peer traffic onto slow RELAY paths.
+# Default OFF; when disabled this function changes nothing. ufw adds v4 and v6 rules
+# and skips duplicates, so re-running is idempotent.
+ztg_apply_firewall_zerotier_udp() {
+  if ! ztg_is_true "${ZEROTIER_ALLOW_UDP_INBOUND:-false}"; then
+    return 0
+  fi
+  ztg_log_step "ZeroTier UDP inbound"
+  ztg_log_info "Allow inbound 9993/udp for ZeroTier DIRECT peer paths."
+  if command -v ufw >/dev/null 2>&1; then
+    ztg_run ufw allow 9993/udp comment zerotier
+  else
+    ztg_log_warn "ufw not found. Allow inbound UDP 9993 manually if a firewall blocks it."
+  fi
+}
