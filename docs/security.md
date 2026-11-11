@@ -1,62 +1,63 @@
-# 安全说明
+# 安全边界与已知风险
 
-## 必须保持的默认策略
+ZeroTier 的 Private Network 和成员授权是接入控制的基础，但它们**不能自动保证**应用协议加密、凭据文件权限、双栈 DNS/IPv6 路由或公网发布服务本身的安全。本项目提供脚本和示例，运行时服务与所在主机的安全配置仍需你负责。
 
-- ZeroTier 网络应保持为私有网络。
-- 新设备必须手动授权。
-- 代理默认不启用账号密码认证；如果你的 ZeroTier 网络里有不可信设备，重新运行初始化脚本启用认证。
-- 代理默认监听 Ubuntu 的 ZeroTier IP，只供 ZeroTier 私有网络访问。
-- 只有没加入 ZeroTier 的设备也要用代理，或明确需要优化代理测速时，才启用代理公网入口。
-- 远程控制端口不要暴露到公网。
-- `.env` 不要提交到仓库。
+## 默认网络暴露面
 
-## 功能边界速查
+| 功能 | 默认/可选入口 | 主要风险 |
+|---|---|---|
+| 私有 mixed HTTP/SOCKS5 | 仅 Ubuntu ZeroTier IP（示例 `10.246.77.1:10808`） | 同网络中不可信成员可能滥用代理；应限制成员 |
+| 公网 mixed HTTP/SOCKS5 | 可选 `0.0.0.0:10808` | **无内建 TLS**，明文代理与密码暴露风险，可能形成开放代理 |
+| ZeroTier UDP 9993 | 可选放行入站 `9993/udp` | 有助于 NAT/P2P 连通，但不保证 DIRECT；需审查云安全组 |
+| IPv4 Exit Node | ZeroTier 内转发/NAT | 改变开启 Allow Default 的客户端 IPv4 出口；IPv6/DNS 边界独立 |
+| 指定 TCP 中转 | Ubuntu ZeroTier IP 上的指定转发端口 | 可达性、转发目标权限和中转可用性依赖网关 |
+| 公网站点发布 | 指定公网 TCP/HTTPS 入口 | 实际互联网暴露目标服务、认证和漏洞 |
+| Windows 多代理节点池 | `127.0.0.1:20808` | 本地服务和计划任务；故障时新连接失败而非自动直连 |
+| 代理限速 | 已有代理端口上的 tc 规则 | 不准确的 IP/CIDR 可能限错对象；不会自动管控所有流量 |
 
-| 功能 | 默认暴露面 | 会修改什么 | 主要风险 |
-|---|---|---|---|
-| 私有代理 | 只监听 Ubuntu 的 ZeroTier IP | sing-box 服务与项目配置 | ZeroTier 网络内不可信设备可访问代理 |
-| ZeroTier UDP 9993 | 可选放行入站 `9993/udp`，默认关闭（`ZEROTIER_ALLOW_UDP_INBOUND` / `--allow-zerotier-udp`） | `install-proxy.sh` 的 ufw 规则，备注 `zerotier` | 只开放 ZeroTier 协议端口，不暴露代理；不放行时对端可能只能走 RELAY |
-| 公网代理 | 可选监听 `0.0.0.0:10808` | sing-box 监听与防火墙计划 | 来源限制或认证为空时，公网来源都可能尝试连接 |
-| 私有 Exit Node | 不开放公网代理端口 | IPv4 forwarding、NAT/forward 规则和恢复服务 | 开启 Allow Default 的客户端整机流量改走 Ubuntu，IPv6 需单独验证 |
-| 中转兜底 | 只监听 Ubuntu ZeroTier IP 的中转端口 | systemd socket/service 和目标 Windows 防火墙来源 | 远程流量绕经 Ubuntu，延迟和可用性依赖中转节点 |
-| 按客户端限速 | 不新增公网入口 | `tc` filter 与恢复服务 | 客户端 IP/CIDR 选错会限错对象 |
-| 公网站点发布 | 明确公网端口或域名 | 项目 systemd unit、UFW 规则或项目 Caddy | 公开目标应用自身漏洞、弱认证或管理后台 |
-| 多台代理自动切换 | Windows 本地 `127.0.0.1:20808` | 当前用户计划任务、runtime 文件和本地 sing-box | 所有节点故障时新连接失败，不会自动直连兜底 |
+## 已知安全风险：含口令文件权限
 
-## 私有 Exit Node
+Ubuntu 初始化器写出的 `.env` 可能包含 `PROXY_USERNAME` / `PROXY_PASSWORD`；模板渲染会生成 `artifacts/sing-box-server.json`，并复制到 `/etc/zerotier-gateway/sing-box-server.json`。当前源码没有在这些路径上统一实施“仅所有者可读”的严格权限策略；**权限风险尚未通过代码修复**。
 
-[私有 Exit Node](exit-node.md)适合手机移动网络整机走 Ubuntu 出口，同时不开放公网 `10808/tcp`。
+部署者可先检查并临时限制这些文件的读取权限，但这不能消除文件生成瞬间可能采用过宽权限的风险：
 
-安全边界：
-
-- Ubuntu 只允许 ZeroTier 网段经项目 NAT/forward 规则转发。
-- ZeroTier Central 的默认路由不会强制所有设备接管流量；客户端还必须自己开启 Allow Default。
-- Windows 默认不启用 Allow Default，因此不会因为手机 Exit Node 自动全局走 VPN。
-- 外网站点看到的出口 IP 仍是 Ubuntu 公网出口 IP；“私有”指入口路径不暴露公网代理端口。
-- 首期只覆盖 IPv4；必须用 `https://api64.ipify.org` 单独检查 IPv6 是否绕行。
-
-## 默认私有入口
-
-默认代理入口只供 ZeroTier 私有网络内访问：
-
-```text
-10.246.77.1:10808
+```bash
+stat -c '%a %U:%G %n' .env artifacts/sing-box-server.json 2>/dev/null
+sudo stat -c '%a %U:%G %n' /etc/zerotier-gateway/sing-box-server.json 2>/dev/null
+# 在核实所有权、服务所需权限后按需限制文件读取：
+[ -f .env ] && chmod 600 .env
+[ -f artifacts/sing-box-server.json ] && chmod 600 artifacts/sing-box-server.json
+[ -f /etc/zerotier-gateway/sing-box-server.json ] && sudo chmod 600 /etc/zerotier-gateway/sing-box-server.json
 ```
 
-这种模式下，云防火墙和系统防火墙都不要把 `10808` 开放到公网。
+若配置目录由多人共用，应特别注意目录和备份权限。**不要将 `.env`、生成 JSON、带口令的错误日志上传仓库或 Issues。** 源码修复需作为单独安全任务审批、实施和测试。
 
-已经加入 ZeroTier 的 Windows 优先使用这个入口。它只在私有网络内可访问，比直接暴露公网代理端口更安全。
+## 公网代理不等于 TLS
 
-## 可选公网入口
+`templates/sing-box/server-mixed.json.tmpl` 的 mixed inbound 未配置 TLS。即使启用了账号密码，也不能宣称公网代理通信和凭据得到传输加密。
 
-如果默认入口测速慢，可按[公网代理](proxy-public.md)通过初始化脚本显式开启公网入口，不需要编辑配置文件。
+默认建议：优先使用私有 ZeroTier 入口；如确需互联网直接访问，必须独立评估加密传输、身份认证、来源限制、系统防火墙、云安全组和滥用日志，并参考 [公网代理](proxy-public.md)。**不要将“公网路径可能更快”写成无条件安全推荐。**
 
-建议：
+## IPv4 Exit Node 与 Windows 路由
 
-- 开启公网入口后，已经加入 ZeroTier 的设备仍可继续用 `10.246.77.1:10808`。
-- 没加入 ZeroTier 的设备，或实测公网路径更快时，才使用服务器公网 IP。
-- 初始化时来源公网 IP/CIDR 可以留空；留空表示全部来源都能访问公网代理端口。
-- 长期使用时，建议填写公司、家里当前公网 IP 的 `/32`。
-- 云厂商防火墙也可以限制来源 IP，不要只依赖应用层配置。
-- 代理账号密码仍然是可选项；如果来源 IP 不固定，或白名单留空，建议在初始化脚本中启用认证。
-- 不要把远程控制端口暴露到公网；公网入口只用于代理上网。
+ZeroTier Central 的 `0.0.0.0/0` 只是提供默认路由能力；客户端还需要显式允许。Windows 脚本没有证据证明会自动把仓库中的 `allowDefault=0` 模板应用到已安装客户端，因此**必须现场检查每台设备的 Allow Default 与路由状态**。
+
+本 Exit Node 当前只接管 IPv4；访问 `https://api.ipify.org` 显示 Ubuntu IPv4 不代表 IPv6 及 DNS 一定同路。使用 `https://api64.ipify.org` 和实际 DNS 测试查明边界，必要时关闭使用该出口的业务。
+
+## 防火墙与回退边界
+
+`scripts/ubuntu/lib/firewall.sh` 含按端口删除 UFW allow 规则的逻辑，可能触及没有项目专属 marker 的历史规则。调整公网入口、重新安装代理前，建议记录 `sudo ufw status numbered`，预览变更并核实所有权，不要把所有受影响规则都视为“项目只管理自己创建的资源”。
+
+`install-proxy.sh --allow-zerotier-udp` 除了 ZeroTier UDP UFW 放行，**还会刷新或重启 sing-box 代理**，请考虑已有会话的中断。若云厂商安全组拦截 UDP，单独修改 Ubuntu UFW 不一定足够。
+
+## 公网站点发布
+
+公开某一内网站点不等于公开整个 ZeroTier 网络；但公开的目标应用仍需自己的身份认证、限流、更新和日志。不要无保护地公开 RDP、SSH、数据库和管理后台。项目不能修改未知云厂商安全组、路由器入站 NAT 或上游 DNS。
+
+## 退出与卸载
+
+停用 IPv4 Exit Node 时先让使用它的客户端取消 Allow Default，再按需移除 Central 默认路由，最后停用 Ubuntu 项目 NAT。`uninstall.sh` 只覆盖基础代理服务，不会自动回收所有高级功能、Central 路由和主机历史规则。见[回滚与卸载](rollback.md)。
+
+## 版本与验证等级
+
+当前 `VERSION` 为 `1.4.0-dev`，已发布 v1.3.0 的 Git tag 与开发中的 `main` 不可混用。文档静态检查、脚本模拟测试与真实 Ubuntu/Windows/Android 网络验收是不同证据等级，不能互相替代。

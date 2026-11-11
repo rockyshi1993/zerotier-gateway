@@ -6,16 +6,24 @@ on:
     paths:
       - "README.md"
       - "CHANGELOG.md"
+      - "VERSION"
       - "docs/**"
       - "website/**"
+      - "scripts/**"
+      - "templates/**"
+      - "config/**"
       - ".github/workflows/pages.yml"
   pull_request:
     branches: [main]
     paths:
       - "README.md"
       - "CHANGELOG.md"
+      - "VERSION"
       - "docs/**"
       - "website/**"
+      - "scripts/**"
+      - "templates/**"
+      - "config/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -32,30 +40,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: website/package-lock.json
-
       - name: Install website dependencies
         working-directory: website
         run: npm ci
-
-      - name: Check documentation
+      - name: Verify docs, scripts, built pages and static assets
         working-directory: website
-        run: npm run check
-
+        run: npm run verify
       - name: Configure Pages
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/configure-pages@v5
-
-      - name: Build documentation site
-        working-directory: website
-        run: npm run build
-
       - name: Upload Pages artifact
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-pages-artifact@v4
         with:
           path: website/dist

@@ -1,164 +1,75 @@
 # ZeroTier Gateway
 
-用现有脚本搭建 ZeroTier 私有远程访问、Ubuntu HTTP/SOCKS5 代理、手机私有 Exit Node 和可选中转。
+为已有的 **ZeroTier 私有网络**按需部署自托管网关能力：Ubuntu HTTP/SOCKS5 代理、IPv4 Exit Node、指定 TCP 转发、内网站点发布，以及 Windows 代理节点管理辅助工具。
 
-> 普通流程只需要运行脚本并按提示操作，不需要编辑脚本或手工填写整页参数。
+- [在线文档](https://rockyshi1993.github.io/zerotier-gateway/)
+- [部署第一个私有网关](docs/quick-start.md)
+- [选择接入方式](docs/install.md)
+- [故障排查](docs/troubleshooting.md)
 
-- [5 分钟快速开始](docs/quick-start.md)
-- [完整用户文档](docs/index.md)
-- 在线站点：`https://rockyshi1993.github.io/zerotier-gateway/`（合并到 `main` 并启用 GitHub Pages 后发布）
+> 当前 `main` 使用开发版本标识 `1.4.0-dev`。已存在 `v1.3.0` Git tag，但开发分支的功能、脚本及文档不可直接视为 v1.3.0 的正式交付内容。生产使用前应按所选择的提交或 tag 验证。
 
-## 适合什么场景
+## 选择你的目标
 
-- 家里和公司两台 Windows 需要通过 ZeroTier 互相远程。
-- 浏览器或指定软件需要使用 Ubuntu 节点代理，但不想改成全局代理。
-- Pixel/Android 在移动网络下需要整机走 Ubuntu 出口，但不想暴露公网代理端口。
-- 需要排除指定域名、IP 或进程不走代理。
-- ZeroTier 直连长期不稳定，需要 Ubuntu 作为备用中转。
-- 有多台代理服务器，希望 Windows 只配置一个自动切换入口。
-- 需要按客户端限制代理速度，或从公网发布一个明确的本地站点。
-
-## 最简网络
-
-| 设备 | 作用 | 推荐 ZeroTier IP |
+| 目标 | 是否需要 Ubuntu 网关 | 起点 |
 |---|---|---|
-| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选 Exit Node/中转 | `10.246.77.1` |
-| 家里 Windows | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
-| 公司 Windows | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
+| 两台 ZeroTier 成员互访或远程桌面 | **不需要** | [仅设备互访](docs/remote.md) |
+| 浏览器或指定软件走 Ubuntu 公网出口 | **需要** | [私有代理部署](docs/quick-start.md) |
+| Android 移动网络 IPv4 整机走 Ubuntu 出口 | **需要** | [私有 Exit Node](docs/exit-node.md) |
+| 通过公网 Ubuntu 发布 ZeroTier 内的服务 | **需要** | [内网站点发布](docs/publish-site.md) |
+| 多台代理节点故障自动切换 | 需要可用代理节点 | [多代理节点池](docs/proxy-multi-server.md) |
 
-远程工具填写对方 Windows 的 ZeroTier IP。代理默认填写 `10.246.77.1:10808`。
+## 先分清三类流量
 
-> 加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。只有主动配置代理的软件才会走 Ubuntu 出口。
+1. **私网互访：** 加入同一个 ZeroTier 私有网络后，访问目标设备的 ZeroTier IP；不会自动改变默认互联网出口。
+2. **指定软件代理：** 软件主动连接 Ubuntu 的 `10.246.77.1:10808`（示例地址）；未配置的软件继续走自己的网络。
+3. **IPv4 Exit Node：** Ubuntu 启用 IPv4 转发与 NAT，Central 添加默认路由，且客户端显式允许默认路由后，客户端 IPv4 才经 Ubuntu 出口。
 
-> 手机移动网络要整机走 Ubuntu 出口时，不推荐暴露公网代理端口；请按[私有 Exit Node](docs/exit-node.md)逐台开启默认路由。
+这些模式相互独立。单纯访问私有代理 **不需要**启用 Allow Default。IPv4 出口通过也不代表 IPv6 和 DNS 都不会绕行。
 
-## 开始前准备
+## 能力与边界
 
-1. 在 [ZeroTier Central](https://my.zerotier.com) 创建私有网络，并记下 16 位网络编号。
-2. 准备一台可使用 `sudo` 的 Ubuntu。
-3. 家里和公司两台 Windows 已安装 ZeroTier，并能使用管理员 PowerShell。
-4. 两台 Windows 已安装你平时使用的远程工具。
+| 能力 | 实现 | 默认 |
+|---|---|---|
+| Ubuntu 私有 HTTP/SOCKS5 | sing-box mixed inbound，示例 `10.246.77.1:10808` | 基础代理安装启用 |
+| IPv4 Exit Node | forwarding + iptables NAT，按客户端允许默认路由 | 关闭 |
+| TCP 中转 | systemd socket/proxyd，指定服务端口 | 按需 |
+| 公网站点发布 | systemd TCP 端口映射、独立 Caddy HTTPS | 关闭 |
+| Windows 本地节点池 | sing-box + 登录计划任务，健康检查与新连接切换 | 按需 |
+| 代理分流与限速 | PAC/本地 sing-box、Linux tc | 按需 |
 
-## 最快开始
+此项目不是 ZeroTier 控制器、通用中继服务、VPN 协议实现或 Web 管理平台。TCP 中转不优化 ZeroTier 底层 P2P 链路；自动节点切换不迁移已有 TCP 连接，也不是负载均衡。
 
-先克隆项目：
+## 部署私有代理的最短路径
+
+在一台支持 sudo 的 Ubuntu 上，先创建私人 ZeroTier Network 并获取 16 位 Network ID：
 
 ```bash
 git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd zerotier-gateway
-```
-
-Ubuntu 运行：
-
-```bash
 bash scripts/ubuntu/init-config.sh
-sudo bash scripts/ubuntu/install.sh --dry-run
-sudo bash scripts/ubuntu/install.sh
-sudo bash scripts/ubuntu/health-check.sh
+sudo bash scripts/ubuntu/install-zerotier.sh
 ```
 
-然后在 ZeroTier Central 授权 Ubuntu，并固定为 `10.246.77.1`。
-
-两台 Windows 都加入同一个 ZeroTier 网络并在 Central 授权、固定地址后，用管理员 PowerShell 运行初始化脚本：
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\windows\init-config.ps1
-```
-
-家里电脑运行：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-.\scripts\windows\test-network.ps1
-```
-
-公司电脑运行：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-.\scripts\windows\test-network.ps1
-```
-
-`Home` 和 `Work` 表示当前电脑的身份，不要在同一台电脑上混用。
-
-使用微软远程桌面时，还要在被访问电脑运行 `enable-remote-desktop.ps1 -Apply`；完整顺序见[5 分钟快速开始](docs/quick-start.md)，实际成功以[安装与互访验证](docs/verification.md)为准。
-
-## 常用任务
-
-| 你想做什么 | 直接查看 |
-|---|---|
-| 第一次完整配置 | [快速开始](docs/quick-start.md) |
-| 检查是否安装成功、两台电脑是否互相访问 | [安装与互访验证](docs/verification.md) |
-| 分别配置 Ubuntu 或 Windows | [Ubuntu 节点](docs/ubuntu.md) · [Windows 客户端](docs/windows.md) |
-| 公司访问家里或家里访问公司 | [远程访问](docs/remote.md) |
-| 给浏览器、v2rayN 或指定软件配置代理 | [代理上网](docs/proxy.md) |
-| Pixel/Android 移动网络整机走 Ubuntu 出口 | [私有 Exit Node](docs/exit-node.md) |
-| 不经过 ZeroTier，直接使用公网代理 | [公网代理](docs/proxy-public.md) |
-| 添加多台代理服务器并切换 | [多台代理服务器](docs/proxy-multi-server.md) |
-| 排除域名、IP 或进程 | [代理排除规则](docs/proxy-rules.md) |
-| 正在使用旧版本，需要安全升级 | [安全升级](docs/upgrade.md) |
-| 给指定代理客户端限制速度 | [按客户端限速](docs/rate-limit.md) |
-| 通过公网 IP+端口或域名访问站点 | [公网站点发布](docs/publish-site.md) |
-| 直连不稳定时启用中转 | [中转兜底](docs/relay.md) |
-| 手机/对端到 Ubuntu 显示 RELAY、出口很慢 | [放行 ZeroTier UDP 9993](docs/troubleshooting.md#0-ubuntu-节点放行-zerotier-udp-9993)（`install-proxy.sh --allow-zerotier-udp`，默认关闭） |
-| 安装失败、权限报错或连不通 | [故障排查](docs/troubleshooting.md) |
-| 卸载或恢复 | [回滚与卸载](docs/rollback.md) |
-
-## 代理怎么用
-
-已加入 ZeroTier 的设备优先使用私有入口：
-
-```text
-地址：10.246.77.1
-端口：10808
-协议：HTTP 或 SOCKS5
-```
-
-没有配置代理的软件继续使用本机网络。公网代理入口、认证、PAC、进程排除和 TUN 使用判断都属于进阶场景，请看[代理上网](docs/proxy.md)。
-
-Pixel/Android 没有 Wi‑Fi 时想整机走 Ubuntu，走[私有 Exit Node](docs/exit-node.md)：Ubuntu 执行 `manage-exit-node.sh enable --apply`，ZeroTier Central 添加 `0.0.0.0/0 via 10.246.77.1`，只在手机上开启 Allow Default。Windows 默认不会因此全局走 VPN。
-
-多台 Ubuntu 自动切换时，软件日常只使用 `127.0.0.1:20808`；公网访问本地站点使用独立发布命令，不要把 SOCKS 代理端口当作 Web 站点入口。
-
-## 成功标准
-
-- Ubuntu、家里电脑和公司电脑都已在 ZeroTier Central 授权，地址不冲突。
-- Ubuntu `health-check.sh` 能看到代理监听。
-- 两台 Windows 的 `test-network.ps1` 没有关键失败。
-- 远程工具使用对方 ZeroTier IP 可以连接。
-- 需要代理的软件能通过 `10.246.77.1:10808` 上网。
-- 如果启用私有 Exit Node，Pixel 移动数据访问 `https://api.ipify.org` 显示 Ubuntu 出口 IP，并单独检查 `https://api64.ipify.org` 的 IPv6 边界。
-
-这些结论不能只凭脚本“没有报错”判断。请按[安装与互访验证](docs/verification.md)运行服务、双向 ping、3389、实际远程登录和代理出口命令。
-
-## 出错时先做什么
-
-Ubuntu：
+**此时先到 ZeroTier Central 授权服务器，确认实际分配的 Managed IP 已出现在 Ubuntu 网卡上**，再安装代理：
 
 ```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
 sudo bash scripts/ubuntu/health-check.sh
 ```
 
-Windows：
+`--dry-run` 用于预览系统变更；其中代理脚本仍可能在项目 `artifacts/` 生成本地配置产物，并非完全无文件写入。完整前置、客户端设置与端到端验收参见 [快速开始](docs/quick-start.md)。
 
-```powershell
-.\scripts\windows\show-diagnostics.ps1
-.\scripts\windows\test-network.ps1
-.\scripts\windows\test-proxy.ps1
-```
+## 安全提醒
 
-仍未解决时，按症状查看[故障排查](docs/troubleshooting.md)。看到“拒绝访问”或 `Windows System Error 5` 时，请确认当前窗口是管理员 PowerShell。
+- 私有 ZeroTier 网络启用成员授权；不公开 RDP、SSH、数据库等管理端口。
+- **不推荐将未加密的公网 HTTP/SOCKS5 mixed 代理直接暴露互联网。** 本项目公网 mixed 监听并不自动提供 TLS；账号密码认证不等于加密。
+- 代理认证信息会进入 `.env` 和生成的 JSON 配置；当前版本的某些脚本未保证这些文件只允许所有者读取。请核对权限，并避免共享工作目录与提交凭据。
+- `uninstall.sh` 主要移除代理服务，不代表自动清理所有可选功能、Central 路由及历史防火墙规则。参见 [安全边界](docs/security.md) 和 [回滚与卸载](docs/rollback.md)。
 
-## 文档
+## 文档与维护
 
-- [文档首页](docs/index.md)
-- [安装总览](docs/install.md)
-- [安装与互访验证](docs/verification.md)
-- [手机移动网络私有 Exit Node](docs/exit-node.md)
-- [安全说明](docs/security.md)
-- [发布验证（维护者）](docs/release.md)
+[Ubuntu](docs/ubuntu.md) · [Windows](docs/windows.md) · [私有代理](docs/proxy.md) · [Exit Node](docs/exit-node.md) · [服务发布](docs/publish-site.md) · [限速](docs/rate-limit.md) · [多节点](docs/proxy-multi-server.md) · [升级](docs/upgrade.md) · [版本发布流程](docs/release.md)
 
-## License
-
-[MIT](LICENSE)
+许可证：[MIT](LICENSE)。欢迎通过 [Issues](https://github.com/rockyshi1993/zerotier-gateway/issues) 反馈可复现的问题；涉及真实网络故障时请去除 Network ID、私有凭据和公网地址后再上传日志。

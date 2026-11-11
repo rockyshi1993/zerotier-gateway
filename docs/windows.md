@@ -1,152 +1,81 @@
-# Windows 客户端
+# Windows 客户端：接入、远程与代理
 
-涉及防火墙规则写入时，请以管理员身份运行 PowerShell。
+Windows 上可以分别完成三件事：作为 ZeroTier 私网成员访问其他设备、提供 RDP/其他远程服务，以及主动使用 Ubuntu 代理。**这三者不要求同时启用。**
 
-打开方式：
+## 0. 获取脚本（只在需要本项目辅助功能时）
 
-1. 关闭普通 PowerShell 窗口。
-2. 开始菜单搜索 `PowerShell` 或 `Windows Terminal`。
-3. 右键选择“以管理员身份运行”。
-4. 在资源管理器中打开仓库目录，再从地址栏或右键菜单打开管理员 PowerShell。以下命令均在仓库根目录执行。
+**只需要 ZeroTier 成员互访，不必下载本仓库。** 如果要使用下面的 `enable-remote-desktop.ps1`、`setup.ps1` 或诊断脚本，则需要在**实际执行脚本的那台 Windows** 上获取项目文件。
 
-确认当前窗口是不是管理员：
+已经安装 Git 的 Windows 可以在 PowerShell 中运行：
+
+```powershell
+git clone https://github.com/rockyshi1993/zerotier-gateway.git
+cd .\zerotier-gateway
+```
+
+没有 Git 时，可以打开 [GitHub 仓库](https://github.com/rockyshi1993/zerotier-gateway)，选择 **Code → Download ZIP**，解压后在该目录中打开 PowerShell。建议先核对仓库来源和当前版本；下文的 `.\scripts\windows\...` 命令均以**仓库根目录**为工作目录。
+
+涉及启用 RDP 或修改防火墙的命令要使用管理员 PowerShell；仅使用 ZeroTier 客户端或普通网络测试不要求为本项目额外提升权限。
+
+## 1. 普通 ZeroTier 成员
+
+安装 ZeroTier，加入一个由你授权的 Private Network，并在 Central 给该电脑分配一个与现有网段不冲突的 Managed IP。此时即可尝试访问其他 ZeroTier 成员的服务，不需要部署 Ubuntu 网关，也不需要执行本项目 `setup.ps1`。
+
+不要把“已加入 ZeroTier”理解成“Windows 全局使用 Ubuntu 出口”。Windows 自身的 ZeroTier **Allow Default** 必须单独查看；仓库虽有 `allowDefault=0` 模板，但当前 Windows 初始化/设置脚本并未证明会自动把它应用到已安装客户端。使用 Exit Node 前后务必在客户端实际核对。
+
+## 2. 需要微软远程桌面时
+
+被访问设备须使用支持 RDP 主机的 Windows 版本；Windows Home 不能作为内置 RDP 主机。管理员 PowerShell 在仓库根目录执行：
 
 ```powershell
 ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-```
-
-返回 `True` 才能写入防火墙规则；如果返回 `False`，先关闭窗口，重新用“以管理员身份运行”打开。
-
-如果 PowerShell 提示“无法加载文件”或 `PSSecurityException`，先在当前窗口执行：
-
-```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\windows\enable-remote-desktop.ps1
+.\scripts\windows\enable-remote-desktop.ps1 -Apply
 ```
 
-这只会放行当前 PowerShell 窗口，关掉窗口后会恢复。它不会提升管理员权限。
+权限检查应返回 `True`。`Set-ExecutionPolicy -Scope Process` 仅对当前 PowerShell 进程放宽执行策略，**不会提升权限**。在公司受管设备上，系统策略可能禁止此操作，请遵守管理员授权要求。
 
-## 初始化
+## 3. 可选的 Home/Work 防火墙辅助
 
-第一次使用前，先生成配置：
+下面脚本只适合你明确采用默认 Home/Work 两角色时使用。需要先完成 ZeroTier 授权、确认本机与对端 IP，然后分别在两台 Windows 上运行初始化器：
 
 ```powershell
 .\scripts\windows\init-config.ps1
 ```
 
-需要让这台电脑接受微软远程桌面连接时，再执行：
+家里电脑在管理员终端预览并应用：
 
 ```powershell
-.\scripts\windows\enable-remote-desktop.ps1 -Apply
-```
-
-脚本会检查 Windows 版本并保持网络级别身份验证开启；Windows Home 不支持作为微软远程桌面主机，可继续使用其他远程控制工具。
-
-两台 Windows 都加入同一个 ZeroTier 网络后，分别在对应电脑执行一次：
-
-家里电脑：
-
-```powershell
-# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Home
-```
-
-公司电脑：
-
-```powershell
-# 在仓库根目录执行
-.\scripts\windows\setup.ps1 -Role Work
-```
-
-脚本会先打印防火墙计划。确认计划正确后，再追加 `-ApplyFirewall` 真正写入规则。
-
-防火墙计划会包含两类入站规则：
-
-| 规则 | 用途 |
-|---|---|
-| 对端 Windows IP | 家里和公司通过 ZeroTier 直连远程 |
-| `UBUNTU_ZT_IP` | 直连不稳定时，允许 Ubuntu 中转服务器转发到这台 Windows |
-
-`-Role Home` 只在家里电脑执行，`-Role Work` 只在公司电脑执行。如果某台 Windows 只加入 ZeroTier 网络，但不需要被另一台电脑远程访问，也不需要本项目生成规则，可以不执行 `setup.ps1`。
-
-如果你有多台 Ubuntu 中转服务器，目标 Windows 只需要允许“当前要用的中转服务器”访问远程端口。重新运行 `init-config.ps1`，一路回车保留现值、只更新 Ubuntu IP，再重跑对应角色的 `setup.ps1 -ApplyFirewall` 即可自动更新规则。
-
-查看脚本写入的规则：
-
-```powershell
-# 家里电脑查看 Home 规则；公司电脑把 Home 改成 Work
-Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
-  Select-Object DisplayName,Enabled,Direction,Action,Profile
-
-Get-NetFirewallRule -DisplayName "ZT Gateway * Inbound Home 3389" |
-  Get-NetFirewallAddressFilter |
-  Format-List RemoteAddress
-```
-
-脚本自动生成的中转规则名是 `ZT Gateway Relay Inbound Home 3389` 或 `ZT Gateway Relay Inbound Work 3389`。如果你手动创建了自定义规则名，查询时要使用实际创建过的名字。
-
-## 更多 Windows 电脑
-
-ZeroTier 网络可以加入两台以上 Windows。默认脚本只内置两个角色：
-
-| 角色 | 默认 IP |
-|---|---|
-| Home | `10.246.77.10` |
-| Work | `10.246.77.20` |
-
-额外电脑可以固定为 `10.246.77.30`、`10.246.77.31` 等地址。只使用代理或只访问别人的电脑，不需要执行 `setup.ps1`。
-
-如果额外电脑也加入了 ZeroTier，软件代理仍然优先填 `10.246.77.1:10808`。额外电脑没有加入 ZeroTier，或需要走服务器公网路径时，按[公网代理](proxy-public.md)配置。
-
-如果额外电脑也要被远程访问，请在那台电脑上用管理员 PowerShell 手动放行允许访问它的对端 ZeroTier IP。例如只允许公司电脑访问第三台电脑的 `3389`：
-
-```powershell
-New-NetFirewallRule -DisplayName "ZT Extra Remote 3389" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3389 -RemoteAddress 10.246.77.20 -Profile Any
-```
-
-如果信任整个 ZeroTier 私有网络，可以把 `-RemoteAddress` 改成 `10.246.77.0/24`。不要把远程端口放行到公网。
-
-家里电脑：
-
-```powershell
-# 在仓库根目录执行
 .\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
 ```
 
-公司电脑：
+公司电脑使用 `-Role Work`。规则计划包含对端 Windows 的远程来源，以及所配置的 Ubuntu TCP 中转来源；若从未部署 Ubuntu 中转，应用前仍应审查来源列表，不要默认放行不需要的路径。
+
+额外的第三台 Windows 可以直接加入 ZeroTier；现有 `setup.ps1` 不会自动覆盖新角色。需要在第三台提供远程服务时，按服务实际端口和允许来源配置 Windows 防火墙，或选择相应远程软件的官方配置方式。
+
+## 4. Windows 软件使用私有代理
+
+只使用 HTTP/SOCKS5 代理时，不需要执行 Home/Work 防火墙步骤。已入网的 Windows 软件主动配置 Ubuntu ZT IP 和代理端口（示例 `10.246.77.1:10808`），或使用 v2rayN 的 SOCKS 节点。
 
 ```powershell
-# 在仓库根目录执行
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
+Test-NetConnection 10.246.77.1 -Port 10808
+curl.exe --ssl-no-revoke -x socks5h://10.246.77.1:10808 https://api.ipify.org
 ```
 
-不要在同一台电脑上把 `-Role Home` 和 `-Role Work` 都执行一遍。`Role` 表示“当前这台电脑是谁”，不是你要连接的目标。
+第一条验证 TCP 可达，第二条验证经过代理访问互联网。两种结果必须分别判断；如果软件本身没有接管系统流量，即使第二条成功也不能宣称整个 Windows 已切换网络出口。
 
-如果看到 `New-NetFirewallRule : 拒绝访问。` 或 `Windows System Error 5`，说明当前窗口没有足够权限，或系统策略拒绝写入防火墙。请用“以管理员身份运行”的 PowerShell 重新执行，并先运行：
+更多规则与节点池见 [代理分流](proxy-rules.md) 和 [Windows 本地自动节点池](proxy-multi-server.md)。开启 v2rayN TUN 时需要自行防止将 ZeroTier 路由或远程流量错误纳入 TUN。
 
-```powershell
-# 在仓库根目录执行
-([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-## 诊断
+## 5. 诊断与恢复
 
 ```powershell
+.\scripts\windows\show-diagnostics.ps1
 .\scripts\windows\test-network.ps1
 .\scripts\windows\test-proxy.ps1
-.\scripts\windows\show-diagnostics.ps1 -FindProcess "远程"
 ```
 
-完整的安装成功、双向互访、3389 和代理出口检查见[安装与互访验证](verification.md)。
+`test-proxy.ps1` 使用 Windows 项目根目录 `.env` 里的目标代理配置。若你仅使用软件手动设置代理，也可以直接通过 `Test-NetConnection` 和 `curl.exe` 验证，不必运行配置初始化器。
 
-## 配置路径
-
-默认配置路径是项目根目录下的 `.env`。
-
-如果有两台以上 Ubuntu 代理，希望软件只配置一个本地地址，请按[多台代理服务器](proxy-multi-server.md)使用节点池命令；不要手工维护控制器 JSON 或计划任务。
-
-只有配置文件不在默认位置时，才需要显式指定路径：
-
-```powershell
-.\scripts\windows\test-network.ps1 -Env .\profiles\office.env
-```
+如需移除项目生成的防火墙规则，管理员 PowerShell 执行 `setup.ps1 -Rollback`；它不会卸载 ZeroTier、关闭第三方代理客户端或还原全部 Windows 系统网络设置，详见 [回滚与卸载](rollback.md)。

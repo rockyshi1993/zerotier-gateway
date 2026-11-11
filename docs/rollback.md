@@ -1,94 +1,111 @@
-# 回滚与卸载
+# 停用、回滚与卸载
 
-## Ubuntu
+**先确定要退出的是哪个能力。** 关闭软件代理、关闭 Android IPv4 Exit Node、移除 Ubuntu 代理服务、卸载 ZeroTier 是不同操作。现有 `uninstall.sh` **不是全功能一键恢复工具**。
+
+在执行任何资源删除前，记录实际 IP、服务名、UFW 规则、Central 路由、Windows 任务以及需要保留的其他服务；旧版/开发版混用时先核对当前代码版本。
+
+## 1. 手机/客户端不再使用 Exit Node
+
+必须避免保留一条指向已失效网关的默认路由：
+
+1. 在所有使用此出口的 Android/Windows 等客户端上，先关闭对应 ZeroTier Network 的 **Allow Default** 或停用该 VPN，检查它们能通过正常网络上网。
+2. 在 ZeroTier Central 确认 `0.0.0.0/0 via <Ubuntu ZT IP>` 是否由本任务单独使用。若是且没有其他依赖，则删除；不要删除共享路由。
+3. 在 Ubuntu 预览并应用停止：
+
+```bash
+sudo bash scripts/ubuntu/manage-exit-node.sh disable
+sudo bash scripts/ubuntu/manage-exit-node.sh disable --apply
+```
+
+4. 复验客户端普通公网 IPv4、必要的 IPv6/DNS 访问以及 Ubuntu 项目 Exit Node 状态。此流程不会自动关闭原有应用级 HTTP/SOCKS5 代理。
+
+## 2. 停止 Ubuntu 私有代理
+
+在 Ubuntu 仓库根目录：
 
 ```bash
 sudo bash scripts/ubuntu/uninstall.sh
 ```
 
-该命令会移除本项目管理的代理服务，默认不会卸载 ZeroTier。
+脚本主要移除 `sing-box-zt-proxy.service`；默认不卸载 ZeroTier，也不清理全部可选资源或所有历史防火墙规则。代理软件端还应取消指向该服务的代理入口，否则应用请求可能持续失败。
 
-停用中转：
+在进行大范围卸载前，检查并记录：
+
+```bash
+sudo systemctl list-units 'zerotier-gateway-*' --all
+sudo ufw status numbered
+```
+
+不要未经审查就删除未知归属的防火墙规则。生成的 `.env`、`artifacts/` 和 `/etc/zerotier-gateway/` 可能仍含凭据，需要按安全保留策略单独处置。
+
+## 3. 单独关闭 TCP 中转
 
 ```bash
 sudo bash scripts/ubuntu/disable-relay.sh
 ```
 
-该命令会停用并移除本项目生成的 `zerotier-gateway-relay-*.socket` 和 `zerotier-gateway-relay-*.service`。默认不会影响 ZeroTier 本身和代理服务。
+此操作关闭项目生成的中转 systemd 单元；检查 Windows 远程工具是否还在连接中转的 Ubuntu ZT IP/443、444 等端口。关闭中转不应影响设备通过 ZeroTier IP 直接互访。
 
-新增能力按对象单独关闭或删除，不需要卸载整套网络：
+## 4. 单独停用限速或服务发布
+
+限速规则：
 
 ```bash
-sudo bash scripts/ubuntu/manage-rate-limit.sh disable --name <规则名> --apply
-sudo bash scripts/ubuntu/manage-rate-limit.sh remove --name <规则名> --apply
-sudo bash scripts/ubuntu/manage-exit-node.sh disable --apply
-sudo bash scripts/ubuntu/manage-publish.sh remove --name <映射名> --apply
-sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name <域名映射名> --apply
+sudo bash scripts/ubuntu/manage-rate-limit.sh disable --name laptop
+sudo bash scripts/ubuntu/manage-rate-limit.sh disable --name laptop --apply
+sudo bash scripts/ubuntu/manage-rate-limit.sh remove --name laptop --apply
 ```
 
-管理层升级只回退 state，使用升级输出的 backup id：
+公网 IP+端口映射：
+
+```bash
+sudo bash scripts/ubuntu/manage-publish.sh remove --name mysite
+sudo bash scripts/ubuntu/manage-publish.sh remove --name mysite --apply
+```
+
+域名发布：
+
+```bash
+sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name mysite
+sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name mysite --apply
+```
+
+确认云安全组/入口防火墙和 DNS 是否还存在以前的公网开放；项目的删除命令不能替代这些外部平台操作。
+
+## 5. Windows 资源
+
+在管理员 PowerShell 下移除由 Home/Work 脚本创建的规则：
+
+```powershell
+.\scripts\windows\setup.ps1 -Rollback
+```
+
+若启用了多代理节点池，先停用再删除其计划任务和受控运行文件：
+
+```powershell
+.\scripts\windows\manage-proxy-pool.ps1 -Action Disable -Apply
+.\scripts\windows\manage-proxy-pool.ps1 -Action Remove -Apply -ConfirmRemoval
+```
+
+如果此前启用了 Windows RDP 主机，还应在系统的远程桌面设置中关闭不再使用的 RDP 功能；`enable-remote-desktop.ps1` 没有对称的 `-Disable` 参数。上述操作不自动删除 v2rayN 配置、Windows 系统代理设置或 ZeroTier 客户端。应检查目标软件是否仍指向不存在的 `127.0.0.1:20808`。
+
+## 6. 升级回退的限制
 
 ```bash
 sudo bash scripts/ubuntu/upgrade.sh --rollback <backup-id>
 ```
 
-## Windows
-
-用管理员 PowerShell 移除本项目创建的 Windows 防火墙规则：
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\windows\setup.ps1 -Rollback
-```
-
-停用自动代理入口但保留节点：
-
-```powershell
-.\scripts\windows\manage-proxy-pool.ps1 -Action Disable -Apply
-```
-
-完全移除自动代理任务和项目运行文件：
-
-```powershell
-.\scripts\windows\manage-proxy-pool.ps1 -Action Remove -Apply -ConfirmRemoval
-```
-
-Windows 管理状态回退：
-
 ```powershell
 .\scripts\windows\upgrade.ps1 -Rollback <backup-id> -Apply
 ```
 
-生成的 PAC 和本地客户端配置位于 `artifacts/` 目录，可按需手动删除。
+这些命令主要回退**项目管理状态**，不等于完整回滚网关网络、包版本、ZeroTier Central 或第三方客户端。务必按 [安全升级](upgrade.md) 核对具体场景。
 
-## 发布回滚
+## 7. 完成后的检查
 
-如果发布过程中发现 `vX.Y.Z` tag 或 GitHub Release 创建错误，先确认没有用户正在基于该版本安装或测试，再执行回滚。
+- Ubuntu 不再监听已关闭的代理/中转/发布端口；仍使用的功能不受影响。
+- Windows/Android 的代理与默认路由设置指向仍存在的服务，且真实访问成功。
+- 云安全组、DNS、Central Managed Routes 与本机状态一致；没有留下不需要的公网入口。
+- 敏感文件和日志按运维策略保留或安全销毁，并且没有提交到 GitHub。
 
-本地 tag 回滚：
-
-```bash
-git tag -d vX.Y.Z
-```
-
-远端 tag 回滚：
-
-```bash
-git push origin :refs/tags/vX.Y.Z
-```
-
-GitHub Release 回滚：
-
-```bash
-gh release delete vX.Y.Z --yes
-```
-
-如果发布 commit 已经推送但需要撤回，优先使用 `git revert <commit>` 创建反向提交，再重新发布补丁版本。不要在共享分支上使用强制推送覆盖历史，除非仓库维护者明确确认。
-
-发布后验收失败时，建议按以下顺序处理：
-
-1. 停止继续传播 Release 链接。
-2. 在 GitHub Release 说明中标记已撤回或直接删除错误 Release。
-3. 删除错误 tag。
-4. 用 `git revert` 或补丁 commit 修复主分支。
-5. 重新运行发布验证后发布新的补丁版本。
+Git tag 和 GitHub Release 的创建、回退属于仓库维护者发布流程，不属于用户卸载说明，见 [发布验证](release.md)。

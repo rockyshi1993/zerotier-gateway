@@ -1,84 +1,43 @@
-# 安装指南
+# 开始使用：选择接入方式
 
-这是一张安装路线图，帮助你判断每个设备该做什么。第一次搭建请直接按[5 分钟快速开始](quick-start.md)执行；完整命令只在快速开始和对应设备页维护。
+本项目提供的是 **ZeroTier 私网之上的可选网关能力**。先决定你希望哪部分流量经过 Ubuntu，再选择最小步骤；无需默认安装家里/公司两台 Windows 的完整脚本链。
 
-## 整体流程
+## 哪种方式最适合你？
 
-| 顺序 | 在哪里操作 | 要完成什么 | 详细页面 |
-|---:|---|---|---|
-| 1 | ZeroTier Central | 创建私有网络并记下网络编号 | [快速开始](quick-start.md) |
-| 2 | Ubuntu | 运行初始化与安装脚本 | [Ubuntu 节点](ubuntu.md) |
-| 3 | ZeroTier Central | 授权 Ubuntu，固定 `10.246.77.1` | [快速开始](quick-start.md) |
-| 4 | 两台 Windows | 加入网络、运行初始化和角色脚本 | [Windows 客户端](windows.md) |
-| 5 | ZeroTier Central | 家里固定 `10.246.77.10`，公司固定 `10.246.77.20` | [快速开始](quick-start.md) |
-| 6 | 两台 Windows | 逐层验证入网、互访、远程端口和实际连接 | [安装与互访验证](verification.md) |
-| 7 | 需要代理的软件 | 按需填写 `10.246.77.1:10808` | [代理上网](proxy.md) |
+| 目标 | 设备与前置 | 正确入口 | 不需要做的事 |
+|---|---|---|---|
+| 只访问另一台电脑或内网服务 | 两台设备能加入同一私有 ZeroTier 网络 | [仅成员互访](remote.md) | 不必安装 Ubuntu、代理、Exit Node |
+| 指定浏览器/软件换成 Ubuntu 出口 | Ubuntu + 至少一台已授权客户端 | [部署私有网关](quick-start.md) | 不必启用 RDP / Allow Default |
+| Android 移动数据时整机 IPv4 走 Ubuntu | 已入网 Ubuntu + Android ZeroTier 客户端 | [IPv4 Exit Node](exit-node.md) | 不必配置 Windows Home/Work 或公开 10808 |
+| 把内网 Web/TCP 服务发布到公网 | 公网可达 Ubuntu + ZeroTier 内目标服务 | [公网站点发布](publish-site.md) | 不必使用 Exit Node |
+| 多节点代理自动故障转移 | 两台以上已验证可用的代理 + Windows | [多代理节点池](proxy-multi-server.md) | 不需要全局负载均衡控制器 |
 
-## 每台设备负责什么
+## 部署网关前的核对清单
 
-### Ubuntu 节点
+- 有自己管理的 **私有 ZeroTier 网络**和 16 位 Network ID；已了解成员需要授权。
+- Ubuntu 可使用 `sudo`、`systemd`、`ip`、`iptables` 等工具；准备可安装 ZeroTier 和 sing-box 的网络环境。
+- 选择一个与家里 LAN、公司网络、云 VPC、其他 VPN **不冲突**的 IPv4 网段。`10.246.77.0/24` 只是示例。
+- 在 ZeroTier Central 确认 Ubuntu 将使用的 Managed IP；这必须与本地 `.env` 里的 Ubuntu ZT IP 一致。
+- 客户端能够安装 ZeroTier，并能够访问目标 IP；需要 RDP 时目标 Windows 版本和账号须满足条件。
+- 正在升级旧版时先读 [安全升级](upgrade.md)，不要把首次安装当成升级手段。
 
-- 加入 ZeroTier 私有网络。
-- 提供默认私有 HTTP/SOCKS5 代理。
-- 运行健康检查。
-- 只有直连长期不稳定时才启用 TCP 中转。
+## 两阶段安装为何重要
 
-具体命令和服务状态见[Ubuntu 节点](ubuntu.md)。
+`install.sh` 是现有的一体化入口，会先安装并加入 ZeroTier，再部署代理。如果 Ubuntu 在 Central 尚未授权、尚未获得计划 IP，sing-box 绑定该 IP 的启动可能失败。
 
-### 家里 Windows
+新手推荐：[第一阶段安装 ZeroTier 并授权](quick-start.md#2-安装并授权-zerotier) → [第二阶段安装代理](quick-start.md#3-安装私有代理)。
 
-- 在 ZeroTier Central 固定为 `10.246.77.10`。
-- 使用 `Home` 角色生成并应用防火墙计划。
-- 远程访问公司时填写 `10.246.77.20`。
+只有**已经具备正确 ZT IP**的现有 Ubuntu 节点，才可根据自己的需要使用一体化 `install.sh`。本轮没有改变其源码行为。
 
-### 公司 Windows
+## 安装会修改哪些内容
 
-- 在 ZeroTier Central 固定为 `10.246.77.20`。
-- 使用 `Work` 角色生成并应用防火墙计划。
-- 远程访问家里时填写 `10.246.77.10`。
+| 操作 | 主要作用 | 是否默认执行 |
+|---|---|---|
+| ZeroTier 安装/入网 | 安装 `zerotier-one` 并设置客户端网络标志 | 网关首次安装 |
+| 私有代理安装 | 安装 sing-box、写入配置和 systemd 服务、可能配置 UFW | 主路径 |
+| IPv4 Exit Node | 修改 IP forwarding、NAT/forward、恢复服务 | 仅选择时 |
+| TCP 中转 | 创建指定 systemd socket/service | 可选 |
+| 公网发布 | 创建项目转发或 Caddy 服务，并配置入口 | 可选 |
+| Windows 代理节点池 | 本地运行文件和登录计划任务 | 可选 |
 
-Windows 管理员权限、执行策略和角色命令见[Windows 客户端](windows.md)。
-
-## 只做部分功能
-
-| 目标 | 最少需要完成 |
-|---|---|
-| 只做家里和公司远程 | 完成快速开始中的网络、Ubuntu 入网、两台 Windows 和远程验证；代理可以不用 |
-| 只让某台设备使用代理 | 该设备加入 ZeroTier 并获授权，软件填写 `10.246.77.1:10808`；不需要成为 Home/Work |
-| 让 Pixel/Android 移动网络整机走 Ubuntu 出口 | 先完成 Ubuntu 入网和基础验证，再按[私有 Exit Node](exit-node.md)启用；不需要开放公网代理端口 |
-| 只从一台电脑访问其他电脑 | 加入网络并获授权即可；只有“被访问”的 Windows 需要正确防火墙规则 |
-| 增加更多 Windows | 给每台设备分配不同的 `10.246.77.x`；不要复用 Home/Work 身份 |
-| 增加第二台 Ubuntu 中转 | 给新服务器独立 ZeroTier IP，再按[中转兜底](relay.md)规划端口 |
-
-## 默认选择
-
-- ZeroTier 网段使用 `10.246.77.0/24`。
-- 代理优先使用私有入口 `10.246.77.1:10808`。
-- 私有 Exit Node 默认关闭；只有在客户端允许默认路由时才全局走 Ubuntu 出口。
-- 代理账号密码可以不启用。
-- Windows 远程优先直连对方 ZeroTier IP。
-- TUN、代理公网入口、排除规则和中转都不是第一次成功的必选项。
-
-## 成功后再看的内容
-
-- 检查安装、互访、远程端口和代理出口：[安装与互访验证](verification.md)
-- 想用 v2rayN 或 PAC：[代理上网](proxy.md)
-- 手机移动网络要整机走 Ubuntu 且不暴露公网代理：[私有 Exit Node](exit-node.md)
-- 不经过 ZeroTier 直接使用服务器公网代理：[公网代理](proxy-public.md)
-- 部署多个地区并在客户端切换：[多台代理服务器](proxy-multi-server.md)
-- 正在使用旧版本并希望保持当前服务运行：[安全升级](upgrade.md)
-- 给指定客户端限制代理速度：[按客户端限速](rate-limit.md)
-- 通过公网 IP+端口或域名访问本地站点：[公网站点发布](publish-site.md)
-- 想排除域名、IP 或进程：[代理排除规则](proxy-rules.md)
-- TUN 开启后远程不通：[远程访问](remote.md)
-- 直连延迟高或长期显示 RELAY：[中转兜底](relay.md)
-- 权限、安装、监听或网络异常：[故障排查](troubleshooting.md)
-- 卸载项目生成的服务和规则：[回滚与卸载](rollback.md)
-
-## 安全边界
-
-- 不要把 Windows 远程端口直接暴露到公网。
-- 公网代理入口启用后，应结合自己的使用环境评估认证和来源限制。
-- 初始化脚本生成的配置包含网络和代理信息，不要把本地 `.env` 提交到仓库。
-
-下一步：[开始第一次配置](quick-start.md)。
+高级变更的退出步骤统一从 [回滚与卸载](rollback.md) 进入。第一次安装完成后按 [分层验证](verification.md) 检查真实出口，不以脚本退出零作为唯一成功标准。
