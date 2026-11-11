@@ -142,10 +142,9 @@ export function validateBehaviorContracts(read) {
     // Only executable command lines count; prose mentioning a script is not evidence
     // that the install guide actually instructs users to run it.
     const join = source.search(/^\s*sudo bash scripts\/ubuntu\/install-zerotier\.sh(?:\s|$)/m);
+    const networkCheck = source.search(/^\s*sudo zerotier-cli listnetworks\s*$/m);
     const proxy = source.search(/^\s*sudo bash scripts\/ubuntu\/install-proxy\.sh(?:\s|$)/m);
-    if (join < 0 || proxy < 0 || join >= proxy ||
-        source.indexOf('zerotier-cli listnetworks', join) > proxy ||
-        !source.includes('zerotier-cli listnetworks')) {
+    if (join < 0 || proxy < 0 || networkCheck < join || networkCheck >= proxy || join >= proxy) {
       errors.push(label + ' must authorize and inspect ZeroTier before installing sing-box');
     }
   }

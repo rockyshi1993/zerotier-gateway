@@ -83,6 +83,9 @@ test('source-linked behavior contracts pass and reject unsafe regressions', () =
   checkRegression('docs/proxy-multi-server.md',
     s => s.replaceAll('sudo bash scripts/ubuntu/install-zerotier.sh', 'sudo bash scripts/ubuntu/install.sh'),
     'multi-server must authorize');
+  checkRegression('docs/proxy-multi-server.md',
+    s => s.replaceAll('sudo zerotier-cli listnetworks', 'echo "ZeroTier OK"'),
+    'multi-server must authorize');
   checkRegression('docs/windows.md',
     s => s.replace("show-diagnostics.ps1 -FindProcess 'ZeroTier'", 'show-diagnostics.ps1'),
     'docs/windows.md must give actionable');

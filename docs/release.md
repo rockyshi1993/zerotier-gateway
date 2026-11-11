@@ -35,13 +35,15 @@ bash -n scripts/ubuntu/lib/*.sh
 ```bash
 bash tests/shell/env-parse.test.sh
 bash tests/shell/init-config.test.sh
-# 在 Linux/macOS 的 Bash 终端
+# 在 Linux/macOS 的 Bash 终端；任何失败都立即停止
+set -euo pipefail
 for test in tests/shell/*.test.sh; do bash "$test"; done
 ```
 
 Windows 使用 **PowerShell** 运行所有回归测试（与 Bash 分开执行）：
 
 ```powershell
+$ErrorActionPreference = 'Stop'
 Get-ChildItem tests/powershell -Filter '*.Tests.ps1' | ForEach-Object { & $_.FullName }
 ```
 

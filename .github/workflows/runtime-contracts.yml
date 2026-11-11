@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "scripts/**"
+      - "config/**"
+      - "VERSION"
       - "tests/**"
       - "templates/**"
       - "docs/**"
@@ -14,6 +16,8 @@ on:
     branches: [main]
     paths:
       - "scripts/**"
+      - "config/**"
+      - "VERSION"
       - "tests/**"
       - "templates/**"
       - "docs/**"
