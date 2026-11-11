@@ -2,6 +2,21 @@
 
 Windows 上可以分别完成三件事：作为 ZeroTier 私网成员访问其他设备、提供 RDP/其他远程服务，以及主动使用 Ubuntu 代理。**这三者不要求同时启用。**
 
+## 0. 获取脚本（只在需要本项目辅助功能时）
+
+**只需要 ZeroTier 成员互访，不必下载本仓库。** 如果要使用下面的 `enable-remote-desktop.ps1`、`setup.ps1` 或诊断脚本，则需要在**实际执行脚本的那台 Windows** 上获取项目文件。
+
+已经安装 Git 的 Windows 可以在 PowerShell 中运行：
+
+```powershell
+git clone https://github.com/rockyshi1993/zerotier-gateway.git
+cd .\zerotier-gateway
+```
+
+没有 Git 时，可以打开 [GitHub 仓库](https://github.com/rockyshi1993/zerotier-gateway)，选择 **Code → Download ZIP**，解压后在该目录中打开 PowerShell。建议先核对仓库来源和当前版本；下文的 `.\scripts\windows\...` 命令均以**仓库根目录**为工作目录。
+
+涉及启用 RDP 或修改防火墙的命令要使用管理员 PowerShell；仅使用 ZeroTier 客户端或普通网络测试不要求为本项目额外提升权限。
+
 ## 1. 普通 ZeroTier 成员
 
 安装 ZeroTier，加入一个由你授权的 Private Network，并在 Central 给该电脑分配一个与现有网段不冲突的 Managed IP。此时即可尝试访问其他 ZeroTier 成员的服务，不需要部署 Ubuntu 网关，也不需要执行本项目 `setup.ps1`。
