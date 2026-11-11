@@ -1,49 +1,48 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { REQUIRED_DOCS } from './check-docs-core.mjs';
 
 const websiteDir = resolve(import.meta.dirname, '..');
 const distDir = join(websiteDir, 'dist');
-const indexPath = join(distDir, 'index.html');
-const errors = [];
+const base = '/zerotier-gateway/';
+const failures = [];
+const page = (name) => join(distDir, name);
+if (!existsSync(page('index.html'))) failures.push('Missing index.html');
 
-if (!existsSync(indexPath)) {
-  errors.push('缺少构建首页: website/dist/index.html');
-} else {
-  const html = readFileSync(indexPath, 'utf8');
-  const internalLinks = new Set(
-    [...html.matchAll(/href="(\/zerotier-gateway\/[^"?#]*)/g)].map((match) => match[1])
-  );
-  for (const href of internalLinks) {
-    const relative = href.slice('/zerotier-gateway/'.length);
-    const target = relative === '' ? join(distDir, 'index.html') : join(distDir, relative);
-    if (!existsSync(target)) errors.push(`生成首页链接没有静态目标: ${href}`);
-  }
-  for (const route of ['quick-start','remote','proxy']) {
-    const href = `/zerotier-gateway/${route}.html`;
-    if (!html.includes(`href="${href}"`)) errors.push(`生成首页缺少可直达链接: ${href}`);
-  }
-  for (const route of ['quick-start','remote','proxy','verification','proxy-multi-server','rate-limit','publish-site']) {
-    if (!existsSync(join(distDir, `${route}.html`))) errors.push(`首页任务没有生成静态目标: ${route}.html`);
-  }
-  if (!html.includes('site-accessibility.js')) errors.push('生成首页没有加载无障碍增强脚本');
+for (const markdown of REQUIRED_DOCS) {
+  if (markdown === 'index.md') continue;
+  const html = markdown.replace(/\.md$/, '.html');
+  if (!existsSync(page(html))) failures.push(`Missing built route: ${html}`);
 }
+
+const asset = page('site-accessibility.js');
+if (!existsSync(asset)) failures.push('Static site-accessibility.js not copied from docs/public');
 
 if (existsSync(distDir)) {
-  for (const name of readdirSync(distDir).filter((file) => file.endsWith('.html') && file !== '404.html')) {
-    const html = readFileSync(join(distDir, name), 'utf8');
-    if (!/<script src="\.\/site-accessibility\.js" defer>\s*<\/script>/.test(html)) {
-      errors.push(`生成页面无障碍脚本标签未正确闭合: ${name}`);
+  const htmlFiles = readdirSync(distDir).filter(file => file.endsWith('.html') && file !== '404.html');
+  for (const name of htmlFiles) {
+    const content = readFileSync(page(name), 'utf8');
+    // Avoid false positives for third-party assets or absolute external URLs.
+    for (const match of content.matchAll(/\b(?:href|src)=(['"])(.*?)\1/g)) {
+      const raw = match[2];
+      if (!raw.startsWith(base)) continue;
+      let pathname;
+      try { pathname = decodeURIComponent(raw.slice(base.length).split(/[?#]/, 1)[0]); }
+      catch { failures.push(`${name}: invalid URL encoding ${raw}`); continue; }
+      if (!pathname) pathname = 'index.html';
+      if (pathname.endsWith('/')) pathname += 'index.html';
+      if (!existsSync(page(pathname))) failures.push(`${name}: broken built URL ${raw}`);
     }
-    if (html.includes('<script src="./site-accessibility.js" defer>\n  <script>')) {
-      errors.push(`生成页面无障碍脚本吞入后续脚本: ${name}`);
+    if (!content.includes(`${base}site-accessibility.js`)) {
+      failures.push(`${name}: missing base-rooted accessibility asset`);
     }
   }
+  if (!htmlFiles.length) failures.push('No generated HTML pages');
 }
 
-if (errors.length > 0) {
-  console.error('构建站点检查失败:');
-  for (const error of errors) console.error(`- ${error}`);
+if (failures.length) {
+  console.error(`Built documentation validation failed (${failures.length}):`);
+  failures.forEach(message => console.error(`- ${message}`));
   process.exit(1);
 }
-
-console.log('构建站点检查通过：首页公开链接均对应静态文件。');
+console.log('Built site validation passed: all expected static routes and referenced GitHub Pages assets exist.');

@@ -1,89 +1,63 @@
-# 代理排除规则
+# 代理直连与排除规则
 
-当部分流量不应该走 Ubuntu 代理时，使用排除规则。
+分流规则作用于**实际接管请求的客户端**，不在 Ubuntu 代理端自动识别 Windows 上的进程。项目生成 PAC 与 Windows 本地 sing-box 配置，但它们不是语义完全相同的消费者。
 
-排除规则的生效点在客户端，不在 Ubuntu 代理服务本身。Ubuntu 代理只能处理“已经发到代理端口的请求”，不能替 Windows 决定哪些域名、IP 或进程应直连。
+## 规则生效范围
 
-| 规则类型 | 生成文件 | 生效条件 |
-|---|---|---|
-| 域名、域名后缀、IP 网段 | `artifacts/proxy.pac` | 浏览器、系统代理或软件配置了这个 PAC |
-| 域名、IP、进程 | `artifacts/windows-local-client.json` | 本地规则客户端导入这个文件并接管流量 |
-| 手动给某个软件填代理 | 无 | 只影响这个软件；本仓库排除规则不会自动套进去 |
+| 场景 | 生成内容 | 生效前提 | 限制 |
+|---|---|---|---|
+| 域名和 IP 直连 | `artifacts/proxy.pac` | 浏览器/系统/软件显式使用 PAC | 不识别进程；部分 PAC 运行环境 DNS 行为不同 |
+| 域名/IP/进程直连 | `artifacts/windows-local-client.json` | 本地 sing-box 运行且目标软件使用本地入口 | 不等于全机 TUN；进程识别依赖平台/版本 |
+| 软件直接设置 Ubuntu SOCKS/HTTP | 无 | 软件主动把连接送到 Ubuntu | PAC 和本项目规则不会自动套用 |
 
-## 域名和 IP 规则
+## 正确区分精确域名和域名后缀
 
-运行专项配置命令。以下示例让公司域名、ZeroTier 和常见局域网地址直连：
+`DIRECT_DOMAINS` 对应 sing-box `domain` 的**精确匹配**，`DIRECT_DOMAIN_SUFFIXES` 对应 `domain_suffix`，不应把 `*.company.com` 当成通用的跨客户端通配语义。PAC 模板使用 `shExpMatch`，所以它对 `*.company.com` 的含义可能与 sing-box 不一致。
+
+推荐对公司主域名和子域名分别写精确与后缀：
 
 ```powershell
 .\scripts\windows\configure-proxy-rules.ps1 `
-  -DirectDomains 'localhost,*.local,*.company.com' `
-  -DirectDomainSuffixes '.local' `
+  -DirectDomains 'company.com,localhost' `
+  -DirectDomainSuffixes '.company.com,.local' `
   -DirectIpCidrs '10.246.77.0/24,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16' `
   -Generate
 ```
 
-不带参数运行会逐项询问，并显示当前值；直接回车可保留：
+其中 IP 和域名均为示例。精确匹配 `company.com` 与后缀 `.company.com` 共同覆盖主域和子域；是否按预期命中还需要分别验证 PAC 和本地 sing-box，不能只看文件生成成功。
+
+交互式查看/修改现有规则：
 
 ```powershell
 .\scripts\windows\configure-proxy-rules.ps1
 ```
 
-`-Generate` 会同时生成 `artifacts/proxy.pac` 和 `artifacts/windows-local-client.json`。把 PAC 配到浏览器、系统代理或支持 PAC 的软件后才会生效；PAC 不能识别 Windows 进程。
-
 ## 进程规则
 
-进程规则需要在 Windows 本机使用本地规则客户端。Ubuntu 代理只能看到网络请求，无法知道请求来自 Windows 上的哪个进程。
-
-使用内置软件组时直接运行：
+进程规则只能在**本地规则客户端**上处理；Ubuntu 代理没有 Windows 的进程信息。可使用脚本内置的进程组，或显式指定进程名/路径：
 
 ```powershell
 .\scripts\windows\configure-proxy-rules.ps1 -DirectProcessGroups 'remote-tools,chat-tools,game-tools' -Generate
 ```
 
-也可以指定实际进程名或路径：
+多进程客户端需要覆盖真实的辅助进程，否则可能部分流量仍走代理。生成的 JSON 配置不会自行启动或接管流量。
+
+## 使用生成的本地配置
+
+在确认 Windows sing-box 已正确安装后：
 
 ```powershell
-.\scripts\windows\configure-proxy-rules.ps1 `
-  -DirectProcessNames 'mstsc.exe,RemoteTool.exe' `
-  -DirectProcessPaths 'C:\Program Files\RemoteTool\RemoteTool.exe' `
-  -Generate
-```
-
-## 运行本地规则客户端
-
-生成文件不会自动接管流量。项目生成的是 sing-box 配置，可在管理员 PowerShell 中安装并检查：
-
-```powershell
-winget install sing-box
 sing-box check -c .\artifacts\windows-local-client.json
 sing-box run -c .\artifacts\windows-local-client.json
 ```
 
-Windows 安装命令可在 [sing-box 官方 Package Manager 文档](https://sing-box.sagernet.org/installation/package-manager/)核对。
+在目标软件中显式将代理地址指向配置生成的 `127.0.0.1:20808`（以你的实际 `LOCAL_PROXY_PORT` 为准）。停止 sing-box（运行终端内按 `Ctrl+C`）后，也应关闭软件的本地代理，否则请求可能失败。修改或取消分流规则时先停用该本地入口，再重新生成并验证配置，不能仅删除 JSON 就当作恢复了网络状态。
 
-保持这个窗口运行，并把要接管的软件或 Windows 系统代理指向：
+## 规则验证建议
 
-```text
-HTTP/SOCKS5：127.0.0.1:20808
-```
+- `company.com`、`sub.company.com` 应按自己的直连策略逐个验证；`unrelated-example.com` 不应意外命中。
+- 零配置客户端和没有开启代理的软件不受本地 PAC/规则自动控制。
+- 使用 `sing-box check` 验证 JSON 语法和版本适配，并使用真实请求确认命中行为；语法通过不等于流量命中正确。
+- 客户端若使用 TUN、DoH 或特殊 DNS，应独立检查路由/DNS 行为，不能以一个浏览器结果推广到所有应用。
 
-这时链路是“软件 → 本地 sing-box → 按域名/IP/进程决定直连或 Ubuntu 代理”。结束时按 `Ctrl+C` 停止 sing-box，并在软件或系统代理中关闭 `127.0.0.1:20808`。
-
-当前生成配置是本地 mixed 代理，不是 TUN。完全不遵守系统/软件代理的程序不会被它接管；这种情况才需要另行配置 TUN 客户端。
-
-## 多进程软件
-
-多进程软件不要只填一个主程序名，推荐按下面顺序收集规则：
-
-1. 软件分类组。
-2. 安装目录。
-3. 路径正则。
-4. 完整进程名清单。
-
-如果软件会启动服务进程、辅助进程或更新进程，请把这些进程一并纳入规则。
-
-配置后可用下面命令观察相关进程的实际名称和路径：
-
-```powershell
-Get-Process | Where-Object { $_.ProcessName -match 'Remote|ZeroTier|mstsc' } | Select-Object ProcessName,Path
-```
+需要全局 IPv4 出口请看 [Exit Node](exit-node.md)，而不是把本地 mixed 规则误作系统路由。

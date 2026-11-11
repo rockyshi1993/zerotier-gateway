@@ -2,77 +2,82 @@
 pageType: home
 hero:
   name: ZeroTier Gateway
-  text: 用脚本搭建私有远程访问与代理
-  tagline: Ubuntu 提供私有代理和可选中转，Windows 通过 ZeroTier 互相远程；普通流程不需要编辑脚本或配置文件。
+  text: 给已有 ZeroTier 私有网络增加网关能力
+  tagline: 自托管 Ubuntu 代理、IPv4 Exit Node、指定 TCP 转发和内网站点发布。按需部署，不强制让所有设备流量经过网关。
   actions:
     - theme: brand
-      text: 5 分钟快速开始
+      text: 部署私有网关
       link: /quick-start.html
     - theme: alt
-      text: 只看远程访问
-      link: /remote.html
+      text: 先选择场景
+      link: /install.html
     - theme: alt
-      text: 配置代理上网
-      link: /proxy.html
+      text: GitHub
+      link: https://github.com/rockyshi1993/zerotier-gateway
 features:
-  - title: 第一次配置
-    details: 依次完成 Ubuntu、两台 Windows 和 ZeroTier Central 授权。
-    link: /quick-start.html
-  - title: 安装与互访验证
-    details: 检查服务、双向访问、远程端口和真实代理出口。
-    link: /verification.html
-  - title: 远程访问
-    details: 开启被访问电脑，并使用对方 ZeroTier IP 连接。
+  - title: 只想远程访问设备
+    details: 设备加入同一 ZeroTier 网络即可互访，通常无需 Ubuntu 网关。
     link: /remote.html
-  - title: 代理与自动切换
-    details: 配置单台代理，或把多台服务器收敛成一个本地入口。
-    link: /proxy-multi-server.html
-  - title: 按客户端限速
-    details: 只限制指定客户端经过项目代理端口的上下行速度。
-    link: /rate-limit.html
-  - title: 公网站点发布
-    details: 使用公网 IP+端口或显式域名 HTTPS 访问 ZT 内服务。
-    link: /publish-site.html
-  - title: 手机私有 Exit Node
-    details: Pixel 移动网络下整机经 Ubuntu 出口，不开放公网代理端口。
+  - title: 指定软件使用代理
+    details: 在 Ubuntu 部署私有 HTTP/SOCKS5，客户端软件自主选择是否使用。
+    link: /quick-start.html
+  - title: Android 整机 IPv4 出口
+    details: Ubuntu NAT、Central 默认路由及 Android Allow Default 三方协作。
     link: /exit-node.html
+  - title: 公网发布内网站点
+    details: 使用已有公网 Ubuntu 映射指定 TCP 服务或提供 HTTPS 反代。
+    link: /publish-site.html
+  - title: 多节点健康切换
+    details: Windows 本地稳定入口，健康检查后对新连接进行故障转移。
+    link: /proxy-multi-server.html
+  - title: 安全与故障排查
+    details: 私网授权、IPv6/DNS 边界、公网暴露及资源级回退。
+    link: /security.html
 ---
 
-## 先选择你要完成的任务
+## 先分清三种连接方式
 
-| 你的目标 | 从这里开始 |
-|---|---|
-| 第一次搭建 Ubuntu、家里电脑和公司电脑 | [5 分钟快速开始](quick-start.md) |
-| 检查是否安装成功、互相访问是否正常 | [安装与互访验证](verification.md) |
-| 只想让家里和公司互相远程 | [远程访问](remote.md) |
-| 只想给浏览器或指定软件配置代理 | [代理上网](proxy.md) |
-| 手机移动网络也要通过 Ubuntu 出口 | [私有 Exit Node](exit-node.md) |
-| 不加入 ZeroTier，直接使用公网代理 | [公网代理](proxy-public.md) |
-| 添加多台代理服务器并切换 | [多台代理服务器](proxy-multi-server.md) |
-| 需要排除域名、IP 或进程 | [代理排除规则](proxy-rules.md) |
-| 正在使用旧版本，需要安全升级 | [安全升级](upgrade.md) |
-| 限制某个代理客户端的最高速度 | [按客户端限速](rate-limit.md) |
-| 用公网 IP+端口或域名访问本地站点 | [公网站点发布](publish-site.md) |
-| ZeroTier 直连不稳定 | [中转兜底](relay.md) |
-| 安装失败、连不通或权限报错 | [故障排查](troubleshooting.md) |
-
-## 你会得到什么
-
-| 设备 | 作用 | 推荐 ZeroTier IP |
+| 用户行为 | 流量经过哪里 | 还需要做什么 |
 |---|---|---|
-| Ubuntu 节点 | 私有 HTTP/SOCKS5 代理，可选 Exit Node/TCP 中转 | `10.246.77.1` |
-| 家里 Windows | 被公司电脑远程访问，也可以使用代理 | `10.246.77.10` |
-| 公司 Windows | 被家里电脑远程访问，也可以使用代理 | `10.246.77.20` |
+| 访问另一台设备的 ZeroTier IP | ZeroTier 私网路径 | 成员授权、目标服务与防火墙；**无需 Ubuntu** |
+| 为浏览器或软件设置私有代理 | 软件 → Ubuntu `10.246.77.1:10808` → 互联网 | 安装代理，并在软件中主动启用 |
+| 让手机 IPv4 整机经 Ubuntu 出口 | 手机 → ZeroTier → Ubuntu NAT → 互联网 | Ubuntu 启用 Exit Node、Central 路由、手机 Allow Default |
 
-加入 ZeroTier 只表示设备进入同一个私有网络，**不会自动让 Windows 代理上网**。需要代理的软件还要主动填写 `10.246.77.1:10808`，或使用 PAC/本地规则客户端；需要手机移动网络整机走 Ubuntu 时，按[私有 Exit Node](exit-node.md)逐台开启默认路由。
+**加入 ZeroTier ≠ 自动启用应用代理 ≠ 自动改变整机默认路由。** 访问私有 HTTP/SOCKS5 代理不需要开启 Allow Default；IPv4 Exit Node 也不是 HTTP/SOCKS5 服务。
 
-## 使用边界
+## 一张图看懂流量
 
-- 远程优先连接对方 Windows 的 ZeroTier IP，延迟最低。
-- 代理默认只监听 ZeroTier 私有入口；公网入口是可选高级功能。
-- 私有 Exit Node 默认关闭，只影响开启 Allow Default 的客户端。
-- 中转只在直连长期不稳定时启用，不是默认路径。
-- 不要把 Windows 远程端口直接暴露到公网。
-- 公网站点发布只开放明确目标，不等于公开整个 ZeroTier 网络。
+```text
+  Windows / Android / 其他已授权成员
+                  │
+                  ├── ZeroTier IP ──→ 其他成员的私有服务
+                  │
+                  ├── HTTP/SOCKS5 ─→ Ubuntu 私有代理 ─→ 公网
+                  │
+                  └── Allow Default → Ubuntu IPv4 Exit Node ─→ 公网
 
-下一步：[开始第一次配置](quick-start.md)。
+  互联网用户 ─→ 公网 Ubuntu ─→ ZeroTier 内指定 TCP / HTTPS 目标
+                  （只在显式启用发布功能后成立）
+```
+
+这张图表达**互不依赖的可选路径**，不是一条必须经过 Ubuntu 的固定网络链路。示例 `10.246.77.0/24` 可以调整，需避开已有路由网段。
+
+## 能力和限制
+
+| 功能 | 当前实现 | 生效前提 / 限制 |
+|---|---|---|
+| 私有代理 | sing-box mixed HTTP/SOCKS5 | 客户端显式配置；默认私网监听 |
+| 私有 Exit Node | IPv4 forwarding + NAT | 仅 IPv4；IPv6/DNS 需分别检查 |
+| 指定 TCP 中转 | systemd socket-proxyd | 不等于 ZeroTier 底层 DIRECT/RELAY 中继 |
+| 公网服务发布 | IP+端口 / Caddy HTTPS | 必须已有公网可达 Ubuntu |
+| Windows 多代理节点池 | 故障自动切换 | 仅新连接切换，不能做负载均衡 |
+| 分流 / 限速 | PAC、本地 sing-box、tc | 仅覆盖实际经过相应入口的流量 |
+
+## 使用前的重要提醒
+
+- 对互联网开放代理端口并不是常规提速步骤；当前公网 mixed 代理未提供 TLS，认证不代表传输加密。参见[公网代理风险](proxy-public.md)。
+- `--dry-run` 是系统操作预览，但部分脚本仍可能生成工作目录中的配置文件；不要把含密码的产物上传或提交。
+- `VERSION` 当前标记 `1.4.0-dev`，站点内容基于 `main` 的开发中源码，不应直接当成 `v1.3.0` tag 的发布承诺。
+- 安装命令和验证结果以目标 Ubuntu/Windows/Android 实际环境为准。静态文档通过不等于真实网络已经验收。
+
+从 [部署第一个私有网关](quick-start.md) 开始，或者先读 [环境与路径选择](install.md)。

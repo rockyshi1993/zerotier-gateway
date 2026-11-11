@@ -1,168 +1,86 @@
-# 代理上网
+# 私有 HTTP/SOCKS5 代理
 
-Ubuntu 节点通过 sing-box 提供私有 HTTP/SOCKS5 混合代理。
+Ubuntu 使用 sing-box 的 mixed inbound 提供 **HTTP 与 SOCKS5** 代理。默认示例入口 `10.246.77.1:10808` 只在你的 ZeroTier 网络里使用。它不是 ZeroTier 自身的功能；客户端**必须显式配置**要使用代理的软件。
 
-默认私有代理入口：
+## 先看懂流量
 
 ```text
-10.246.77.1:10808
+浏览器 / 指定软件 ── HTTP/SOCKS5 ──→ Ubuntu ZT IP:10808 ──→ 互联网
+其他未配置的软件 ──────────────────→ 客户端自己的默认网络
 ```
 
-默认不需要用户名和密码。需要启用或修改认证时，重新运行初始化脚本并按提示选择即可。
+访问这个私有代理不需要启用 Allow Default。IPv4 Exit Node 是不同的全局路由能力，见 [手机出口](exit-node.md)。
 
-加入 ZeroTier 只代表 Windows 能访问这个入口，不代表会自动代理上网。只有在软件、系统代理、PAC 或本地规则客户端里主动配置代理后，对应流量才会走代理。没有配置代理的软件会继续使用原本网络。
+## 前置和安装
 
-## 代理什么时候生效
+首次 Ubuntu 网关按 [快速开始](quick-start.md) 的两段式流程部署：先让 Ubuntu 加入并获授权、取得正确 ZT IP，再运行 `install-proxy.sh`。可用以下命令确认服务和监听：
 
-| 使用方式 | 生效范围 | 排除规则支持 |
-|---|---|---|
-| 在某个软件里手动填 `10.246.77.1:10808` | 只影响这个软件 | 由软件自己决定，本项目生成的排除规则不会自动生效 |
-| 使用 `artifacts/proxy.pac` | 只影响配置了这个 PAC 的浏览器、系统代理或软件 | 支持域名、域名后缀、IP 网段；不支持进程 |
-| 使用 `artifacts/windows-local-client.json` | 只影响导入并接管流量的本地规则客户端 | 支持域名、IP、进程；仅生成文件不会生效 |
-| 使用[私有 Exit Node](exit-node.md) | 只影响开启 Allow Default 的客户端整机流量 | 不是 HTTP/SOCKS 代理，不使用本页排除规则 |
+```bash
+sudo systemctl is-active sing-box-zt-proxy
+sudo ss -lntp | grep ':10808'
+```
 
-运行初始化或规则配置脚本只会更新本项目配置，不会自动修改 Windows 系统代理；只有软件、PAC 或本地规则客户端实际启用后才会接管流量。
+端口是示例值，实际以你的配置为准。代理默认不启用密码；ZeroTier Private Network 的成员授权仍然很重要。
 
-## v2rayN 如何配置
+## 让客户端软件使用代理
 
-如果你已经在用 v2rayN，可以把本仓库的 Ubuntu 代理作为 v2rayN 里的一个 `SOCKS` 节点。推荐优先添加 SOCKS，不需要再单独添加 HTTP 节点。
-
-已加入 ZeroTier 的 Windows，节点这样填：
+在支持代理的应用中设置：
 
 ```text
-类型：SOCKS
-地址：10.246.77.1
+协议：HTTP 或 SOCKS5
+服务器：10.246.77.1
 端口：10808
-用户名/密码：初始化时未启用认证就留空；启用时填写当时设置的账号
-传输：tcp
-伪装：none
-TLS：关闭
+账号密码：仅启用过代理认证才需要
 ```
 
-如果启用了代理公网入口，并且这台设备没有加入 ZeroTier，或者实测服务器公网路径更快，可以把地址改成 Ubuntu 服务器公网 IP，端口仍然是 `10808`。
+### v2rayN 用户
 
-添加后，在 v2rayN 主界面把这个节点设为活动节点，再开启 v2rayN 的“系统代理”。这时 Windows 系统代理会指向 v2rayN 的本地监听地址；下面以本地监听 `127.0.0.1:10808` 为例，如果你改过 v2rayN 本地端口，以实际设置为准：
+在已加入 ZeroTier 的 Windows 中添加一个 SOCKS 节点，地址填写 Ubuntu 的私有 IP，端口为代理端口，账号密码与实际配置一致。选择该节点后，**还需在 v2rayN 或目标软件里实际启用代理**；添加节点本身不会改变其他应用的网络行为。
+
+当 v2rayN 的系统代理入口为 `127.0.0.1:10808`（仅示例，可能与默认本地端口不同）时，链路是：
 
 ```text
-127.0.0.1:10808
+应用 → 本地 v2rayN → Ubuntu ZeroTier IP:10808 → 公网
 ```
 
-链路会变成：
-
-```text
-浏览器/软件 -> 127.0.0.1:10808 -> v2rayN -> 10.246.77.1:10808 -> Ubuntu 出口
-```
-
-验证：
+验证本地 SOCKS5 入口：
 
 ```powershell
 curl.exe --ssl-no-revoke -x socks5h://127.0.0.1:10808 https://api.ipify.org
-curl.exe --ssl-no-revoke -x socks5h://127.0.0.1:10808 https://www.google.com/generate_204 -I
 ```
 
-第一条能返回 IP，第二条返回 `204`，说明 v2rayN 的本地代理已经能通过 Ubuntu 出口访问网络。
+如果本地监听不是 `10808`，改用软件界面显示的真实端口。
 
-## 已配置 127.0.0.1:10808，还需要开启 TUN 吗？
+## TUN 是否必须启用？
 
-一般不需要。
+一般不必。使用系统代理的应用可以在不启用 TUN 的情况下通过 v2rayN；TUN 会接管更广的流量，存在将 ZeroTier 私网、远程软件和代理服务器路径再次代理导致环路或不可达的风险。
 
-如果 v2rayN 已经开启“系统代理”，并且 Windows 系统代理已经指向 v2rayN 本地监听地址，例如 `127.0.0.1:10808`，浏览器、Git、npm 和大多数遵守系统代理的软件通常已经会走 v2rayN。此时再开启 TUN，反而可能把 ZeroTier 网段、远程工具或代理服务器连接本身也接管进去，造成远程变慢、ZeroTier 不稳定或代理绕路。
+仅当某软件不遵守系统代理，且你已明确了解 TUN 路由范围时再考虑。应在 TUN 规则中排除 ZeroTier 网段、代理服务器本身和必要的远程设备 IP，并验证真实效果。**本项目生成的本地 sing-box mixed 配置不是 TUN 模式**。
 
-只有下面情况才考虑开启 TUN：
+## PAC / 本地规则 / 多节点池的边界
 
-- 某些软件完全不支持系统代理。
-- 游戏、命令行或特殊客户端需要强制代理。
-- 你明确希望几乎所有流量都由 v2rayN 接管。
+| 消费方式 | 实际接管范围 | 规则能力 |
+|---|---|---|
+| 软件手动 HTTP/SOCKS5 | 该软件的代理请求 | 由该软件决定直连策略 |
+| PAC | 配置了 PAC 的软件请求 | 域名、域名后缀、IP，不能依赖进程识别 |
+| Windows 本地 sing-box | 导入配置并主动将流量发送给本地入口的软件 | 域名/IP/进程规则（受客户端和 sing-box 版本影响） |
+| 多节点池本地入口 `127.0.0.1:20808` | 使用该入口的软件的新请求 | 在节点故障时切换新连接，不迁移已有会话 |
 
-如果必须开启 TUN，建议先这样设置：
+参见 [代理排除规则](proxy-rules.md) 和 [多代理节点池](proxy-multi-server.md)。配置文件被生成，不代表流量已经被接管。
 
-```text
-自动路由：开启
-严格路由：先关闭
-协议栈：gvisor
-MTU：1500；如果仍不稳定再改 1400
-IPv6：没有公网 IPv6 时关闭
-```
+## 安全与账号密码
 
-同时在 v2rayN 的直连或绕过规则里保留：
+私有代理使用前应授权和信任 ZeroTier 成员。需要启用或变更认证时，在 Ubuntu 仓库目录重新运行初始化器选择密码，再运行 `install-proxy.sh` 使配置生效。**这会重启现有代理服务，可能影响当前连接。**
 
-```text
-10.246.77.0/24
-10.246.77.1
-服务器公网IP
-127.0.0.1
-localhost
-```
+`.env` 和生成的 JSON 可能包含口令，当前脚本未保证严格文件权限；参见[安全说明](security.md)。若计划公开代理端口，必须先阅读[公网代理](proxy-public.md)的明文传输风险，公网账号密码不等于 TLS 加密。
 
-这样可以避免访问 Ubuntu 代理入口和远程电脑的流量被 TUN 再次代理。
+## 实际验证
 
-## 其他代理任务
-
-- ZeroTier 私有入口慢，或客户端没有加入 ZeroTier：[公网代理：不经过 ZeroTier](proxy-public.md)。
-- Pixel/Android 移动网络整机走 Ubuntu 且不暴露公网代理：[私有 Exit Node](exit-node.md)。
-- 要部署多个地区，并让 Windows 只使用一个本地自动切换入口：[多台代理服务器](proxy-multi-server.md)。
-- 要让域名、IP 或进程直连：[代理排除规则](proxy-rules.md)。
-- 要限制某个客户端经代理的最高速度：[按客户端限速](rate-limit.md)。
-
-## 后续启用或修改账号密码
-
-可以后续重新配置，不需要重新加入 ZeroTier，也不需要从头安装整套网络。
-
-在 Ubuntu 节点的仓库目录重新运行初始化脚本：
-
-```bash
-cd ~/zerotier-gateway
-bash scripts/ubuntu/init-config.sh
-```
-
-脚本检测到已有配置时，直接回车会沿用旧值；走到“是否启用代理用户名和密码”时按需要选择：
-
-- 想启用或修改账号密码：选择启用，然后输入新的用户名和密码。
-- 想关闭账号密码：选择不启用即可。
-
-然后只刷新 Ubuntu 代理服务：
-
-```bash
-sudo bash scripts/ubuntu/install-proxy.sh
-sudo bash scripts/ubuntu/health-check.sh
-```
-
-客户端也要同步：
-
-- 手动给软件填代理的：在软件代理设置里填新的用户名和密码；如果已经关闭认证，就把软件里的用户名和密码也清空。
-- 使用 `artifacts/windows-local-client.json` 的：在 Windows 重新运行初始化脚本输入同一套代理账号，然后重新生成本地规则：
+已加入 ZeroTier 的 Windows 上：
 
 ```powershell
-.\scripts\windows\init-config.ps1
-.\scripts\windows\generate-client-rules.ps1
+Test-NetConnection 10.246.77.1 -Port 10808
+curl.exe --ssl-no-revoke -x socks5h://10.246.77.1:10808 https://api.ipify.org
 ```
 
-## 测试
-
-```powershell
-.\scripts\windows\test-proxy.ps1
-```
-
-## 生成 PAC
-
-```powershell
-.\scripts\windows\generate-proxy-pac.ps1
-```
-
-输出文件：
-
-```text
-artifacts/proxy.pac
-```
-
-## 生成本地客户端规则
-
-```powershell
-.\scripts\windows\generate-client-rules.ps1
-```
-
-输出文件：
-
-```text
-artifacts/windows-local-client.json
-```
+端口通不等于出口正确；返回 Ubuntu 的出口 IP 后，还应测试目标业务软件。失败时按[故障排查](troubleshooting.md)定位，不要直接重新安装所有服务。

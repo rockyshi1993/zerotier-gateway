@@ -1,5 +1,10 @@
 # 故障排查
 
+> **先按失败层定位，不要一上来重装所有服务。** 仅成员互访、应用级 HTTP/SOCKS5 代理、IPv4 Exit Node 是三种不同的路径。
+> 对照 [安装与功能验收](verification.md) 先查 ZeroTier 授权和实际 IP，再查端口、代理出口、Central 默认路由与客户端 Allow Default。
+> `health-check.sh` 的零退出码不等于真实业务请求成功。
+
+
 ## 找不到配置文件
 
 脚本默认读取项目根目录下的 `.env`。
@@ -162,7 +167,7 @@ ping -n 20 <对端 ZeroTier IP>
 Ubuntu 节点如果开着 `ufw` 且默认拒绝入站，ZeroTier 的 UDP `9993` 进不来，手机或其他对端可能打洞失败，退回 `RELAY` 中继，延迟高、抖动大、速度慢（2026-10-26 在东京出口实测：Pixel 到东京显示 `RELAY`，而服务器本身带宽正常）。可选放行，默认关闭，不影响已部署的机器：
 
 ```bash
-# 二选一：.env 中设置 ZEROTIER_ALLOW_UDP_INBOUND=true，或安装时加参数
+# 当前示例的 install-proxy.sh 会刷新/重启代理；已有连接可能中断
 sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp --dry-run   # 先预览
 sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp
 # 已部署的机器也可以只加这一条（ufw 会同时加 IPv4/IPv6，重复执行会跳过）

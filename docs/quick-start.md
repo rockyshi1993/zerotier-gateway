@@ -1,126 +1,117 @@
-# 5 分钟快速开始
+# 快速开始：部署第一个私有 Ubuntu 网关
 
-这条路径只使用项目现有脚本。你无需接触 `.env`、修改脚本或理解全部参数；初始化脚本会逐项询问必要信息。
+本教程实现一个明确目标：**让一台已加入 ZeroTier 的客户端，通过 Ubuntu 私有 HTTP/SOCKS5 代理访问互联网**。
 
-这里的 5 分钟指脚本路径本身；软件下载、ZeroTier Central 授权等待和远程工具账号调试可能需要额外时间。
+不需要准备两台 Windows、不需要开启远程桌面、不需要公网代理，也不需要 Android Allow Default。仅希望成员互访时应直接阅读[仅设备互访](remote.md)。
 
-## 1. 准备 ZeroTier 网络
+## 0. 先确认条件
 
-1. 在 [ZeroTier Central](https://my.zerotier.com) 创建一个私有网络。
-2. 记下 16 位网络编号。
-3. 准备一台可使用 `sudo` 的 Ubuntu，以及家里、公司两台已安装 ZeroTier 的 Windows。
+- 有自己管理的 ZeroTier 私有 Network，记下 **16 位 Network ID**。
+- 一台可使用 `sudo` 的 Ubuntu，联网可安装 ZeroTier/sing-box；部署前确认源代码可信。
+- 至少一台 Windows 或其他客户端可加入同一 ZeroTier 网络并获得授权。
+- 选择不与现有 LAN、VPN 或云网络冲突的网段；以下以 `10.246.77.0/24`、Ubuntu `10.246.77.1` 为示例，而非固定要求。
+- 如系统曾部署本项目，请先阅读[安全升级](upgrade.md)，不要直接按首次安装覆盖配置。
 
-推荐地址：Ubuntu `10.246.77.1`、家里电脑 `10.246.77.10`、公司电脑 `10.246.77.20`。
+## 1. 下载并生成配置
 
-## 2. 获取项目
-
-Ubuntu：
+**执行设备：Ubuntu。** 在普通用户终端进入仓库根目录：
 
 ```bash
 git clone https://github.com/rockyshi1993/zerotier-gateway.git
 cd zerotier-gateway
-```
-
-Windows PowerShell：
-
-```powershell
-git clone https://github.com/rockyshi1993/zerotier-gateway.git
-cd .\zerotier-gateway
-```
-
-后面的命令都在仓库根目录执行。
-
-## 3. 配置并安装 Ubuntu
-
-先运行初始化脚本。除网络编号外，其余问题可以直接回车使用推荐值：
-
-```bash
 bash scripts/ubuntu/init-config.sh
-sudo bash scripts/ubuntu/install.sh --dry-run
-sudo bash scripts/ubuntu/install.sh
 ```
 
-安装完成后，在 ZeroTier Central 授权 Ubuntu 节点，并把它的 Managed IP 固定为 `10.246.77.1`。然后检查：
+初始化器会询问网络编号、网段、Ubuntu/Windows 示例地址、代理端口和可选公网设置。即使没有两台 Windows，Home/Work 的提示也只是保留配置字段，**不代表这两台 Windows 是主路径的前置**。
+
+新手不要启用代理公网入口；如无需认证，私有网络内的成员仍应是你明确授权和信任的设备。初始化后的 `.env` 可能含密码，请避免提交、复制到共享位置。
+
+## 2. 安装并授权 ZeroTier
+
+**执行设备：Ubuntu。** 先预览，再安装 ZeroTier 并加入 Network：
 
 ```bash
+sudo bash scripts/ubuntu/install-zerotier.sh --dry-run
+sudo bash scripts/ubuntu/install-zerotier.sh
+sudo zerotier-cli info
+sudo zerotier-cli listnetworks
+```
+
+安装器在需要时会调用 ZeroTier 官方安装脚本并加入你提供的 Network ID。随后进入 [ZeroTier Central](https://my.zerotier.com)：
+
+1. 打开对应 Network，授权 Ubuntu 成员。
+2. 为它分配一个明确且未冲突的 Managed IP，例如 `10.246.77.1`。
+3. 回到 Ubuntu 检查网络状态以及网卡上实际存在的地址：
+
+```bash
+sudo zerotier-cli listnetworks
+ip -4 -br addr
+```
+
+**继续条件：** `listnetworks` 中该网络为 `OK`，并且 Ubuntu ZeroTier 网卡确实拥有预期 IPv4。未授权、地址不是预期值或网段冲突时，先修正 Central 与本机状态，再继续；不要尝试强行启动绑定不存在 IP 的代理服务。
+
+## 3. 安装私有代理
+
+**执行设备：同一台 Ubuntu，仓库根目录。**
+
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
 sudo bash scripts/ubuntu/health-check.sh
+sudo systemctl is-active sing-box-zt-proxy
+sudo ss -lntp | grep ':10808'
 ```
 
-成功时应看到 Ubuntu 已加入网络，代理监听在 `10.246.77.1:10808`。
+如果初始化时选了其他端口，最后一条命令应改成实际端口。代理默认监听 Ubuntu 的 ZeroTier IP，不需要开放公网 `10808/tcp`。
 
-## 4. 让两台 Windows 加入网络
+**预览边界：** `install-proxy.sh --dry-run` 不应改动系统服务，但其实现仍会在仓库 `artifacts/` 下生成配置产物；这些产物可能包含代理密码，**不是严格零文件写入**。
 
-在家里和公司电脑的 ZeroTier 客户端中加入同一个网络，再到 ZeroTier Central：
+**通过标准：** 服务是 `active`，监听地址是实际 Ubuntu ZeroTier IP 和配置的代理端口。`health-check.sh` 主要显示信息，不能代替下面的真实客户端请求测试。
 
-- 授权两台 Windows。
-- 家里电脑固定为 `10.246.77.10`。
-- 公司电脑固定为 `10.246.77.20`。
+## 4. 让客户端接入 ZeroTier
 
-Windows 只加入网络但不需要被远程访问时，可以跳过下一步的防火墙脚本。
+在客户端安装 ZeroTier，加入**同一个** Network，在 Central 授权并分配不冲突的 Managed IP。
 
-## 5. 配置两台 Windows
-
-两台电脑都用“管理员身份运行”打开 PowerShell，并临时允许当前窗口执行脚本：
+如果用 Windows，先检查它能访问 Ubuntu 私有地址：
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\windows\init-config.ps1
+Test-NetConnection 10.246.77.1 -Port 10808
 ```
 
-家里电脑执行：
+`TcpTestSucceeded` 应为 `True`。如果客户端只是使用代理，无需执行 `setup.ps1 -Role Home|Work`，也无需开启 RDP 或全局路由。
 
-```powershell
-.\scripts\windows\setup.ps1 -Role Home -ApplyFirewall
-.\scripts\windows\test-network.ps1
-```
+## 5. 让指定软件使用代理并验证出口
 
-公司电脑执行：
-
-```powershell
-.\scripts\windows\setup.ps1 -Role Work -ApplyFirewall
-.\scripts\windows\test-network.ps1
-```
-
-`Home` 和 `Work` 表示当前电脑的身份，不要在同一台电脑上混用。看到“拒绝访问”或 `Windows System Error 5` 时，说明当前窗口不是管理员 PowerShell。
-
-## 6. 验证远程访问
-
-不要只看脚本有没有报错。请打开[安装与互访验证](verification.md)，依次检查 Ubuntu 服务、三台设备入网、家里/公司双向访问、远程端口和代理出口。
-
-如果使用微软远程桌面，还需要在被访问的 Windows 上完成[远程主机启用与 3389 验证](verification.md#4-windows-远程主机已开启)。Windows Home 不能作为微软远程桌面主机，但仍可使用其他远程控制工具。
-
-| 方向 | 远程工具填写 |
-|---|---|
-| 公司访问家里 | `10.246.77.10` |
-| 家里访问公司 | `10.246.77.20` |
-
-远程工具优先直连对方的 ZeroTier IP，不要把远程流量强制送进 Ubuntu 代理。两边实际连接成功后再进入代理配置。
-
-## 7. 按需使用代理
-
-只给需要代理的软件填写：
+在浏览器、v2rayN 或支持 HTTP/SOCKS5 的软件中，手动设置：
 
 ```text
-地址：10.246.77.1
-端口：10808
-协议：HTTP 或 SOCKS5
-用户名/密码：初始化时未启用认证就留空
+代理协议：HTTP 或 SOCKS5
+代理服务器：10.246.77.1（替换为实际 Ubuntu ZeroTier IP）
+端口：10808（替换为实际端口）
+认证：仅在初始化时启用了账号密码才填写
 ```
 
-加入 ZeroTier 不会自动启用代理；没有填写代理的软件仍走本机网络。Windows 可以用下面的脚本检查入口：
+Windows 上可用独立的命令验证未启用认证的 SOCKS5 出口：
 
 ```powershell
-.\scripts\windows\test-proxy.ps1
+curl.exe --ssl-no-revoke --proxy socks5h://10.246.77.1:10808 https://api.ipify.org
 ```
 
-Pixel/Android 在移动网络下想整机走 Ubuntu 出口时，不要把 `10808` 开到公网；基础安装成功后按[私有 Exit Node](exit-node.md)启用，Windows 默认不会因此全局走 VPN。
+如果启用了认证，请使用代理软件的安全凭据输入方式，避免把明文口令长期保留在终端历史中。命令返回的公网 IP 应是 Ubuntu 的实际出口 IP；再在你需要的业务软件中实际访问一个网页以完成验收。
 
-## 完成标准
+**没有主动配置代理的其他软件仍用原来的网络。** 访问私有代理不需要启用 ZeroTier 的 Allow Default。
 
-- 三台设备都已授权，且 ZeroTier IP 不冲突。
-- 家里和公司能访问对方的 ZeroTier IP。
-- 两台 Windows 的 `test-network.ps1` 没有关键失败。
-- Ubuntu `health-check.sh` 能看到代理监听。
-- 需要代理的软件能通过 `10.246.77.1:10808` 上网。
+## 6. 出错与安全退出
 
-完成标准必须以[安装与互访验证](verification.md)中的实际命令结果为准，不以“安装脚本执行结束”代替。遇到问题先停在失败的那一层，再看[故障排查](troubleshooting.md)。
+| 失败层 | 先看什么 |
+|---|---|
+| ZeroTier 未 ONLINE / Network 非 OK | 服务、网络 ID、Central 成员授权 |
+| Ubuntu 缺少预期 ZT IP | Central Managed IP、地址冲突、本机路由 |
+| 代理没有监听 | `systemctl status sing-box-zt-proxy`、绑定地址、`ss` |
+| Windows 到 Ubuntu TCP 不通 | 网络成员、服务监听、UFW、安全组（不要直接公开代理） |
+| TCP 通但 SOCKS/HTTP 请求失败 | 代理协议/认证、服务器真实公网访问、错误日志 |
+| 业务软件仍使用本机出口 | 软件是否真的启用代理、目标是否绕过系统代理 |
+
+详细步骤见 [安装验证](verification.md)、[故障排查](troubleshooting.md) 和 [回滚与卸载](rollback.md)。
+
+完成第一个私有网关后，如需手机移动数据**整机 IPv4** 走 Ubuntu，再单独按 [IPv4 Exit Node](exit-node.md) 开启。不要将全局路由与本页的软件代理混为一谈。

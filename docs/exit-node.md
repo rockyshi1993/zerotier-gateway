@@ -1,134 +1,114 @@
-# 手机移动网络：私有 Exit Node
+# Android 移动数据通过 Ubuntu IPv4 Exit Node 上网
 
-这个任务解决的是：Pixel/Android 不连 Wi‑Fi、只用移动数据时，仍然希望整机流量通过 Ubuntu 出口上网，同时不把 `10808/tcp` 代理端口开放到公网。
+这一功能用于让**主动选择该出口的客户端**通过 Ubuntu 的公网 IPv4 出口上网，同时不需要将 HTTP/SOCKS5 代理端口 `10808/tcp` 暴露到互联网。
 
-先完成[快速开始](quick-start.md)，确认 Ubuntu 已加入 ZeroTier 并固定为 `10.246.77.1`。Exit Node 是按需功能，默认关闭；不开启时不会影响现有代理、远程、中转、限速或公网站点发布。
+与“在浏览器中配置私有代理”不同，Exit Node 操作的是 **IPv4 默认路由和 NAT**。它不意味着所有 ZeroTier 成员都自动改变出口，也**不提供 IPv6 或 DNS 绝对无泄漏保证**。
 
-## 先看懂它和代理的区别
+## 先看懂三端职责
 
-| 方式 | 入口 | 适合什么 |
-|---|---|---|
-| 私有代理 | 软件填写 `10.246.77.1:10808` | 浏览器、v2rayN、PAC 或指定软件走 Ubuntu 出口 |
-| 私有 Exit Node | 客户端允许默认路由 | Pixel 移动网络下整机走 Ubuntu 出口 |
-| 公网代理 | 软件填写服务器公网 IP:`10808` | 设备没有加入 ZeroTier，或明确要走公网代理 |
+| 配置位置 | 负责什么 |
+|---|---|
+| Ubuntu | ZeroTier 已入网；IPv4 forwarding / NAT 与转发规则生效 |
+| ZeroTier Central | 将 `0.0.0.0/0` 指向 Ubuntu 的 ZeroTier IP |
+| Android 客户端 | 加入 Network、授权并显式允许 Default Route |
 
-Exit Node 不是 HTTP/SOCKS 代理，不需要开放公网 `10808/tcp`。外网站点看到的出口仍是 Ubuntu 的公网出口 IP；“只走 ZeroTier IP”指手机到 Ubuntu 的入口路径在 ZeroTier 私有网络里，不是隐藏 Ubuntu 的公网出口身份。
+```text
+Android (Allow Default) ── ZeroTier ── Ubuntu IPv4 NAT ── 互联网
+Android IPv6 / DNS ── 需要另行检查实际走向，不能假设被接管
+```
 
-## 1. Ubuntu 预览并启用
+只希望访问 `10.246.77.1:10808` 的 Android 代理客户端，不需要本页默认路由配置；请看 [私有代理](proxy.md)。
 
-在 Ubuntu 仓库根目录执行。第一条只预览，不改系统：
+## 前置条件
+
+- Ubuntu 已加入私有 ZeroTier Network，已获 Central 授权，ZeroTier 网卡拥有计划 IPv4。
+- Ubuntu 可以访问公网，且使用 `systemd`、`iptables`、`ip`、`sysctl`。
+- Android 端已安装可用的 ZeroTier 客户端并加入同一个网络；预先检查设备上的其他 VPN/TUN 应用，因为 Android 通常对同时运行多个 VPN 有限制。
+- 网段不与手机、Wi-Fi、已有 VPN 或云网络冲突。
+- 使用者已评估把移动端流量改由 Ubuntu 出口带来的隐私与可用性影响。
+
+**本页不需要两台 Windows、RDP 或公网 HTTP/SOCKS5 服务。**
+
+## 1. 在 Ubuntu 预览并启用
+
+**执行设备：已加入 ZeroTier 的 Ubuntu。**
 
 ```bash
 sudo bash scripts/ubuntu/manage-exit-node.sh enable
-```
-
-确认 ZeroTier 网段、Ubuntu ZeroTier IP、ZeroTier 网卡和公网出口网卡都对，再执行：
-
-```bash
 sudo bash scripts/ubuntu/manage-exit-node.sh enable --apply
 sudo bash scripts/ubuntu/manage-exit-node.sh status
 ```
 
-脚本会启用 IPv4 forwarding，添加只匹配 ZeroTier 网段的 NAT/forward 规则，并创建项目自己的开机恢复服务。它不会重启现有代理服务，也不会修改公网代理开关。
+第一条仅预览规则计划，第二条应用：启用 IPv4 forwarding、添加来源为 ZeroTier 子网的 NAT/forward 规则，并建立恢复服务。请在执行 `--apply` 前确认 ZeroTier 网卡、公网出口网卡和目标网段完全正确。它不会修改 Central 或 Android 设置，也不会开放公网代理端口。
 
-如果你的 Ubuntu 地址不是默认 `10.246.77.1`，直接在命令里传值即可：
+Ubuntu 的 ZeroTier IP 不是默认例子时，可使用 `--ubuntu-zt-ip` 与 `--zerotier-subnet` 参数明确传入；先预览再应用。执行成功之后还必须进行下面两端配置。
 
-```bash
-sudo bash scripts/ubuntu/manage-exit-node.sh enable --ubuntu-zt-ip 10.246.77.2 --zerotier-subnet 10.246.77.0/24
-```
+## 2. 在 ZeroTier Central 添加路由
 
-仍然先预览；确认后再追加 `--apply`。
-
-### 手机到出口显示 RELAY 时
-
-Ubuntu 节点如果开着 `ufw` 且默认拒绝入站，ZeroTier 的 UDP `9993` 进不来，手机或其他对端可能打洞失败，退回 `RELAY` 中继，延迟高、抖动大、速度慢（2026-10-26 在东京出口实测：Pixel 到东京显示 `RELAY`，而服务器本身带宽正常）。可选放行，默认关闭，不影响已部署的机器：
-
-```bash
-# 二选一：.env 中设置 ZEROTIER_ALLOW_UDP_INBOUND=true，或安装时加参数
-sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp --dry-run   # 先预览
-sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp
-# 已部署的机器也可以只加这一条（ufw 会同时加 IPv4/IPv6，重复执行会跳过）
-sudo ufw allow 9993/udp comment 'zerotier'
-```
-
-之后再看 `zerotier-cli peers`，对端应变为 `DIRECT`。云厂商防火墙组如果挂在这台机器上，也要放行入站 UDP `9993`。撤回：`sudo ufw delete allow 9993/udp`。
-
-## 2. ZeroTier Central 添加默认路由
-
-到 ZeroTier Central 的网络页面，在 Managed Routes 增加：
+**执行位置：ZeroTier Central 中对应 Network 的 Managed Routes。**
 
 ```text
 Destination: 0.0.0.0/0
 Via: 10.246.77.1
 ```
 
-这只是让网络里“存在一个默认出口”。它不会强制所有设备马上全局走 VPN；每台客户端还必须自己允许默认路由。
+把示例 `10.246.77.1` 改成 Ubuntu 的实际 ZeroTier IP。默认路由会提供给网络成员，但成员是否使用它取决于各设备的 ZeroTier 客户端路由设置；**不要将这一步误写成强制让所有客户端全局代理**。
 
-## 3. Pixel / Android 开启默认路由
+## 3. 在 Android 上选择这条默认路由
 
-在 Pixel 上：
+1. 关闭可能冲突的其他 VPN/TUN 应用，连接并授权本项目 Network。
+2. 在该 ZeroTier Network 设置中找到 **Allow Default / Allow Default Route**，明确开启。
+3. 关闭 Wi-Fi，使用移动数据做首次验收，避免出口判断被 Wi-Fi 条件影响。
+4. 必要时重新连接 ZeroTier 网络并查看设备实际路由行为。
 
-1. 关闭 Outline、sing-box SFA、其他 VPN 或加速器。
-2. 打开 ZeroTier One，确认已加入并连接同一个网络。
-3. 进入这个网络的设置，打开 `Allow Default`、`Allow Default Route` 或类似“允许默认路由”的选项。
-4. 关闭 Wi‑Fi，只保留移动数据。
-
-Android 的文案会随 ZeroTier One 版本变化；核心判断是：这个 ZeroTier 网络必须允许默认路由。
+不同 ZeroTier Android 客户端版本的 UI 名称、路由兼容性可能不同；以客户端显示和网络实测为准。Windows 也需按设备检查 Allow Default，不能仅因仓库里存在 `allowDefault=0` 模板就认定电脑不会受默认路由影响；当前 Windows 脚本没有证明模板会自动应用。
 
 ## 4. 验证是否真的生效
 
-Ubuntu 上先看状态：
+在 Ubuntu：
 
 ```bash
+sudo bash scripts/ubuntu/manage-exit-node.sh status
 sudo bash scripts/ubuntu/manage-exit-node.sh test
 ```
 
-Pixel 上用移动数据打开：
+这些命令能显示规则状态和客户端检查清单，**不会代替在手机发起真实公网请求**。
+
+在 Android 关闭 Wi-Fi、保留移动数据、保持 ZeroTier 连接后，访问：
 
 ```text
 https://api.ipify.org
-```
-
-通过标准：返回的是 Ubuntu 服务器的公网出口 IP。
-
-再打开：
-
-```text
 https://api64.ipify.org
 ```
 
-本功能首期只做 IPv4。如果这里显示的是手机运营商 IPv6，说明 IPv6 仍可能绕过 Exit Node；这不是脚本安装失败，而是当前范围没有接管 IPv6。需要严格 IPv6 也走 Ubuntu 时，应作为后续需求单独实现。
+验收：`api.ipify.org` 返回 Ubuntu 实际公网 IPv4；`api64.ipify.org` 是单独的 IPv6 边界检查。若 IPv6 返回运营商地址，当前 IPv4-only 实现并未接管它。还要按需测试域名解析路径，不得宣称严格“无泄漏”。
 
-## Windows 会不会也默认走 VPN？
+## 5. 安全关闭：必须处理三端
 
-不会自动走。
+**不能只执行 Ubuntu `disable --apply` 就宣称客户端已恢复。** 服务端脚本不会自动删除 Central 的 `0.0.0.0/0`，也不会改变 Android 或 Windows 上的 Allow Default 设置。
 
-ZeroTier Central 的默认路由只是网络能力；Windows 还要在客户端自己开启 `Allow Default / Allow Default Route` 才会全局走 Exit Node。当前项目 Windows 模板默认是 `allowDefault=0`，所以 Windows 默认不会因此全局走 VPN，你电脑继续使用现有 v2rayN/私有代理方式，不会因为手机 Exit Node 自动切过去。
+按以下顺序操作，避免客户端仍将默认流量指向已关闭的 Ubuntu 转发节点：
 
-如果你未来想让某台 Windows 也整机走 Ubuntu 出口，再只在那台 Windows 的 ZeroTier 客户端里开启允许默认路由。
-
-## 关闭 Exit Node
-
-先预览：
+1. **客户端：** 先在所有正在使用该 Ubuntu 出口的手机/电脑上关闭 Allow Default，或停用对应 ZeroTier VPN；确认它们已改回正常网络出口。
+2. **Central：** 如果该默认路由就是为本 Exit Node 专门创建，且没有其他正在依赖它的成员，删除 `0.0.0.0/0 via <Ubuntu ZT IP>`；不要误删其他业务路由。
+3. **Ubuntu：** 预览并应用项目规则停用：
 
 ```bash
 sudo bash scripts/ubuntu/manage-exit-node.sh disable
-```
-
-确认后执行：
-
-```bash
 sudo bash scripts/ubuntu/manage-exit-node.sh disable --apply
 ```
 
-关闭只清理项目创建的 sysctl 文件、开机恢复服务和三条带项目标记的 iptables 规则；不会关闭现有 `10.246.77.1:10808` 代理，也不会删除 ZeroTier 网络。
+4. **复验：** Android 重新使用移动数据访问公网，Windows/其他成员确认无错误默认路由，Ubuntu 检查项目 Exit Node 状态。原有应用级私有代理不应被这一操作关闭。
 
-## 常见失败分层
+## 6. 常见异常
 
-| 现象 | 优先检查 |
+| 现象 | 首要判断 |
 |---|---|
-| Pixel 仍显示手机运营商 IPv4 | Central 是否有 `0.0.0.0/0 via 10.246.77.1`；Pixel 是否开启允许默认路由 |
-| Pixel 打不开网页 | Ubuntu `manage-exit-node.sh status` 是否显示 forwarding 和三条规则存在 |
-| Windows 突然也全局走 VPN | 检查那台 Windows 的 ZeroTier 客户端是否开启了 Allow Default |
-| IPv4 成功但 IPv6 是运营商地址 | 当前首期是 IPv4-only；不要把它宣称为严格全流量无泄漏 |
-| 想继续只给浏览器代理 | 不用 Exit Node，仍按[代理上网](proxy.md)配置 `10.246.77.1:10808` |
+| 手机连不上 ZeroTier 私网 IP | 成员授权、网络状态、目标网卡和路由冲突；与 Exit Node 是否开启不同 |
+| 手机能访问 Ubuntu 私网，但 IPv4 出口还是运营商 | Central 默认路由与 Android Allow Default 是否确实生效 |
+| Android 开启后网页全打不开 | Ubuntu 转发/NAT、错误出口网卡、其他 VPN/TUN 冲突、DNS 解析 |
+| IPv4 成功，IPv6 仍是运营商 | 当前项目 **IPv4-only**，不得视为完整双栈出口 |
+| Windows 意外改变出口 | 在该 Windows 实际检查 Allow Default 与路由表，模板存在并不等于已应用 |
+| 显示 RELAY / 很慢 | 先排查网络与 UDP 连通性，见[故障排查](troubleshooting.md)；9993 放行不保证 DIRECT |
+
+公网入口风险见[安全说明](security.md)。本方案不承诺客户端版本之间自动兼容，也不代替真实 Android 网络验收。
