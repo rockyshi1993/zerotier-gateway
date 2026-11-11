@@ -80,12 +80,12 @@ Windows 命令默认只预览，只有 `-Apply` 才写入项目管理状态。�
 验证原有网络和代理：
 
 ```powershell
-.\scripts\windows\show-diagnostics.ps1
+.\scripts\windows\show-diagnostics.ps1 -FindProcess 'ZeroTier'
 .\scripts\windows\test-network.ps1
 .\scripts\windows\test-proxy.ps1
 ```
 
-## 回退管理状态
+其中 `show-diagnostics.ps1 -FindProcess` 仅查询匹配的进程，并非总览健康检查；无参数只显示帮助。后两条测试需要有效的项目 `.env`，且应结合真实互访和出口结果判断是否完成升级。\n\n## 回退管理状态
 
 Ubuntu 使用升级输出中的 backup id：
 

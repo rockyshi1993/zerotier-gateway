@@ -233,7 +233,12 @@ case "$action" in
       https_code="$(curl "${curl_tls[@]}" --silent --show-error --output /dev/null --write-out '%{http_code}' "https://$domain")" || { ztg_log_error 'HTTPS/TLS layer failed.'; exit 1; }
       [[ "$http_code" =~ ^(2|3|401|403) ]] || { ztg_log_error "Unexpected HTTP status: $http_code"; exit 1; }
       [[ "$https_code" =~ ^(2|3|401|403) ]] || { ztg_log_error "Unexpected HTTPS status: $https_code"; exit 1; }
-      ztg_log_info 'Target, HTTP, HTTPS, and certificate validation passed. Test a real page/WebSocket path if the application uses WebSocket.'
+      if [ "$staging" = true ]; then
+        ztg_log_info 'Staging target TCP, HTTP and HTTPS checks passed; certificate trust was NOT verified (--insecure).'
+      else
+        ztg_log_info 'Production target TCP, HTTP and HTTPS checks passed with TLS certificate verification enabled.'
+      fi
+      ztg_log_info 'These checks are not a real application/WebSocket or external-network acceptance test.'
     fi
     ;;
   remove-domain)

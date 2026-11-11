@@ -15,22 +15,32 @@
 
 在 ZeroTier Central 中授权每台服务器并固定不同的 Managed IP，不能重复。
 
-## 2. 每台服务器独立安装
+## 2. 每台服务器独立安装（首次部署必须分两阶段）
 
-在每台 Ubuntu 的仓库根目录分别执行：
+**在每台新 Ubuntu 的仓库根目录分别执行**，使用各自的 ZeroTier IP；不要把第一台的 `.env` 原样复制为第二台的网络地址。
 
 ```bash
 bash scripts/ubuntu/init-config.sh
-sudo bash scripts/ubuntu/install.sh --dry-run
-sudo bash scripts/ubuntu/install.sh
-sudo bash scripts/ubuntu/health-check.sh
+sudo bash scripts/ubuntu/install-zerotier.sh --dry-run
+sudo bash scripts/ubuntu/install-zerotier.sh
+sudo zerotier-cli listnetworks
+ip -4 -br addr
 ```
 
-初始化时只把当前服务器的 Ubuntu ZeroTier IP 填成它自己的地址。每台服务器都必须单独通过[Ubuntu 安装成功验证](verification.md#1-ubuntu-安装成功)。
+现在到 ZeroTier Central **授权这台服务器**，为它固定与其他成员不冲突的 Managed IP（例如第二台 `10.246.77.3`）。确认 `listnetworks` 显示目标网络为 `OK`，且 ZeroTier 网卡上实际存在**这台机器自己的**目标 IPv4 后，才继续：
 
-如果客户端不加入 ZeroTier，则在每台服务器按[公网代理](proxy-public.md)分别开启公网入口。
+```bash
+sudo bash scripts/ubuntu/install-proxy.sh --dry-run
+sudo bash scripts/ubuntu/install-proxy.sh
+sudo bash scripts/ubuntu/health-check.sh
+sudo systemctl is-active sing-box-zt-proxy
+```
 
-升级已有服务器时，不要两台一起处理。按[安全升级](upgrade.md)先验证备用节点、切流，再处理原活动节点。
+`install-proxy.sh --dry-run` 可能在仓库 `artifacts/` 写入含凭据的生成文件，但不会应用系统服务配置。检查 `ss -lntp` 中的监听地址与当前服务器的 ZeroTier IP 一致，随后按下一节验证真实 SOCKS 出口。具体说明见 [首次安装分阶段流程](quick-start.md)。
+
+`install.sh` 会连续执行 ZeroTier 与 sing-box 安装；**首次尚未获得 Managed IP 时不要以它代替以上两阶段步骤**。已存在授权和正确 IP 的机器也应先检查现场配置，再决定是否重装。
+
+如果客户端未加入 ZeroTier，公网代理入口属于独立、高风险的高级模式，**不能作为普通提速方案**；应先阅读 [公网代理安全边界](proxy-public.md)，评估传输加密、来源限制和凭据暴露风险。
 
 ## 3. 先逐台验证真实出口
 
@@ -163,7 +173,8 @@ sudo systemctl start sing-box-zt-proxy
 
 - 控制器只做健康故障转移，不做多节点负载均衡。
 - 已建立的连接不会迁移，切换只保证新连接使用健康节点。
-- `generate-proxy-pac.ps1` 和 `generate-client-rules.ps1` 仍是单入口消费者；需要时重新运行 `init-config.ps1`，按提示把代理入口设为 `127.0.0.1:20808`，再重新生成。
+- **PAC / 本地分流客户端接入节点池尚无自动组合流程。** `init-config.ps1` 的普通私有模式不会把上游设成 `127.0.0.1:20808`；`generate-proxy-pac.ps1` 与 `generate-client-rules.ps1` 的上游使用 `PROXY_CONNECT_HOST:PROXY_PORT`，而节点池的本地入口是独立的 `127.0.0.1:<pool.localPort>`。不能照旧文档通过重新初始化来自动切换它们。
+- 现有受支持的最短路径是让 **v2rayN 或其他支持 SOCKS5/HTTP 的软件直接连接节点池本地入口**。若同时运行生成的本地 sing-box 规则客户端，默认也会占用 `127.0.0.1:20808`，可能发生端口冲突或回环；未经独立设计和端到端验证，不要同时启用两套同端口监听。
 - Windows 重启后由当前用户登录任务恢复；未登录时不会启动用户级本地入口。
 
 出现问题先用旧直连节点恢复工作，再查看 `-Action Status`、Task Scheduler 的 `\ZeroTierGateway\ProxySelector` 和项目 runtime 日志。

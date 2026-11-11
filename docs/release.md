@@ -1,6 +1,6 @@
 # 发布验证
 
-本文记录正式发布前后的最小检查链。当前已发布版本为 `v1.3.0`；仓库中的 `VERSION` 是下一版本候选，未完成真实环境和远端检查前不要把它视为已发布版本。
+本文是**仓库维护者**的发布检查模板，不是普通用户安装步骤。历史标签 `v1.3.0` 已存在，**不能照抄该标签重新创建**；`VERSION=1.4.0-dev` 是开发标识，也不代表可以发布为稳定版本。执行前必须先确认本次正式发布的目标版本号、CHANGELOG 和远端 tag 状态。
 
 ## 发布前检查
 
@@ -13,8 +13,11 @@ git status --short
 确认目标 tag 不存在：
 
 ```bash
-git tag --list v1.3.0
-git ls-remote --tags origin refs/tags/v1.3.0
+# 示例：在真正发布前将 vX.Y.Z 替换为已确认的、尚未发布的正式版本（非 -dev）
+RELEASE_TAG='vX.Y.Z'
+# 注意：此处是模板占位符；替换之前不要继续执行
+git tag --list "$RELEASE_TAG"
+git ls-remote --tags origin "refs/tags/$RELEASE_TAG"
 ```
 
 执行脚本语法检查：
@@ -57,26 +60,26 @@ cd ..
 
 ```bash
 git add .
-git commit -m "chore: prepare v1.3.0 release"
+git commit -m "chore: prepare $RELEASE_TAG release"
 ```
 
-创建 tag：
+只有在前面的检查确认**本地和远端都不存在目标正式 tag**、当前分支和源码状态正确、需要的 CI 已通过后才能创建 tag：
 
 ```bash
-git tag -a v1.3.0 -m "v1.3.0"
+git tag -a "$RELEASE_TAG" -m "$RELEASE_TAG"
 ```
 
 推送主分支和 tag：
 
 ```bash
 git push origin main
-git push origin v1.3.0
+git push origin "$RELEASE_TAG"
 ```
 
-如果本机已登录 GitHub CLI，可以创建 GitHub Release。发布说明建议采用 `CHANGELOG.md` 中 `v1.3.0` 段落的用户可见变更摘要：
+如果本机已登录 GitHub CLI，可以创建 GitHub Release。发布说明建议采用 `CHANGELOG.md` 中本次实际 `$RELEASE_TAG` 对应的用户可见变更摘要：
 
 ```bash
-gh release create v1.3.0 --title "v1.3.0" --generate-notes
+gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --generate-notes
 ```
 
 ## 发布后验收
@@ -84,19 +87,19 @@ gh release create v1.3.0 --title "v1.3.0" --generate-notes
 确认远端 tag 存在：
 
 ```bash
-git ls-remote --tags origin refs/tags/v1.3.0
+git ls-remote --tags origin "refs/tags/$RELEASE_TAG"
 ```
 
 确认 GitHub Release 存在：
 
 ```bash
-gh release view v1.3.0
+gh release view "$RELEASE_TAG"
 ```
 
 再次确认 README 的快速开始仍指向当前主流程：
 
 - 普通用户通过 `init-config.sh` 或 `init-config.ps1` 生成项目配置，不需要手工编辑 `.env`。
-- Ubuntu 入口为 `scripts/ubuntu/install.sh`。
+- Ubuntu **首次安装**优先按 `install-zerotier.sh` → Central 授权/确认 Managed IP → `install-proxy.sh` 两阶段进行；`install.sh` 是既有一体化入口，不能在网络 IP 未就绪时无条件使用。
 - Windows 入口为 `scripts/windows/setup.ps1`。
 - 代理排除规则入口为 `docs/proxy-rules.md`。
 
@@ -105,5 +108,5 @@ gh release view v1.3.0
 ## 已知限制
 
 - 本项目当前没有包管理器发布面，不执行 npm、PyPI 或容器镜像发布。
-- `.github/workflows/pages.yml` 只构建和部署文档站；脚本测试仍需在发布前本地执行，远端 Pages 部署结果需要在推送后单独验收。
+- `.github/workflows/pages.yml` 负责站点构建与部署；Shell/PowerShell 行为测试应由单独 CI 作业验证。真实联网测试仍需在目标设备上完成，远端 Pages 部署也必须在推送后确认。
 - 真实 ZeroTier 网络、Ubuntu 服务安装和 Windows 防火墙变更需要在目标机器上按安装指南实测。

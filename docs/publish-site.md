@@ -134,7 +134,7 @@ sudo bash scripts/ubuntu/manage-publish.sh status-domain --name mysite
 sudo bash scripts/ubuntu/manage-publish.sh test-domain --name mysite
 ```
 
-`test-domain` 检查目标 TCP、HTTP、HTTPS 和证书；DNS 解析失败会在 HTTP/HTTPS 步骤暴露。
+`test-domain` 会检查目标 TCP、域名 HTTP/HTTPS 请求及响应状态。**处于 staging 时，它为测试 CA 使用 `curl --insecure`，不验证证书链是否受浏览器信任**；因此 staging 成功只能证明测试环境的 TLS 通路，并不表示获得了可信生产证书。HTTP 状态码 `401/403` 也可能属于允许的测试结果，不能证明实际业务页面可用。DNS 解析和公网入口仍要从外部网络核验。
 
 staging 证书不受浏览器信任是正常现象。命令检查全部通过后，再切换生产证书：
 
@@ -143,7 +143,7 @@ sudo bash scripts/ubuntu/manage-publish.sh update-domain --name mysite --product
 sudo bash scripts/ubuntu/manage-publish.sh update-domain --name mysite --production --apply
 ```
 
-最后从外网浏览器打开 `https://site.example.com`，确认证书有效、HTTP 自动跳转且真实页面可用；使用 WebSocket 的站点还要测试实际 WebSocket 功能。
+切换到 production 后重新运行 `sudo bash scripts/ubuntu/manage-publish.sh test-domain --name mysite`：**生产检查不使用 `--insecure`**，应在证书链不可信、域名不匹配时失败。最后还需从外网浏览器打开 `https://site.example.com`，确认证书有效、HTTP 自动跳转且真实页面可用；使用 WebSocket 的站点还要测试实际 WebSocket 功能。
 
 失败时按现象处理：
 
