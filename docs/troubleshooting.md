@@ -215,48 +215,36 @@ ping -n 20 <对端 ZeroTier IP>
 
 ## ZeroTier 无法连通
 
-检查：
+这一阶段先核实**实际加入的 Network ID、授权和设备自己的 Managed IP**。成员互访不要求先部署 Ubuntu，也不要求恰好三台设备。
 
-1. 设备已经在 ZeroTier Central 授权。
-2. 基础三台机器的 ZeroTier IP 已按预期固定；更多设备也已固定为不冲突的 IP。
-3. Windows 防火墙允许对端 ZeroTier IP 访问远程端口。
-4. `10.246.77.0/24` 的路由走 ZeroTier。
-5. ZeroTier Central 里没有残留 `172.27.x.x` 地址池或成员 IP。
+1. 两端使用同一个受信任的 ZeroTier Private Network，并且已在 Central 授权。
+2. 每台设备的 ZeroTier 地址与其网卡实际地址一致，且与其他成员不冲突。
+3. 当前私网网段不能与家里、公司、其他 VPN 或云网络的已有路由冲突。
+4. 目标主机确实在对应地址/端口上提供服务；防火墙允许来自预期 ZeroTier 成员的流量。
+5. 如果存在应用级代理或 TUN，先确认它没有错误接管 ZeroTier 网络的路径。
 
-运行：
-
-```powershell
-.\scripts\windows\test-network.ps1
-```
-
-## ZeroTier Central 网段或地址池配置不干净
-
-到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持：
-
-| 位置 | 应该保留 |
-|---|---|
-| `Managed Routes` | `10.246.77.0/24 (LAN)` |
-| `IPv4 Auto-Assign` | 可以关闭自动分配，改为手动固定 IP |
-| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
-
-不要把 `10.246.77.0/24` 填到 `Via`。如果还有 `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池、成员机器上的 `172.27.x.x`，或误填的 `192.168.x.x` 地址池，建议删掉。
-
-基础三台机器只保留：
-
-| 设备 | Managed IP |
-|---|---|
-| Ubuntu 节点 | `10.246.77.1` |
-| 家里 Windows 电脑 | `10.246.77.10` |
-| 公司 Windows 电脑 | `10.246.77.20` |
-
-调整后，在 Windows 上执行：
+Windows 可执行：
 
 ```powershell
-Restart-Service ZeroTierOneService
+zerotier-cli info
 zerotier-cli listnetworks
+Get-NetRoute -AddressFamily IPv4
+Test-NetConnection 10.246.77.1 -Port 10808
 ```
 
-`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
+最后一条仅是**Ubuntu 私有代理已部署时**的示例；只测试成员互访或其他服务时改为实际目标 IP/端口，也不必存在 `10.246.77.1`。需要读取本项目 `.env` 的诊断脚本，先确认该 Windows 已初始化配置。
+
+## ZeroTier Central 地址池与路由检查
+
+在对应 Network 的设置中，核实 `Managed Routes`、`IPv4 Auto-Assign` 与成员手动分配 IP 是否互相一致。
+
+- 新部署时可使用与现有网络**不冲突**的网段；`10.246.77.0/24` 仅是本文示例。
+- 如果使用该示例，Central 的本地私网路由应指向这一网络，不要将该网段误填成经某台成员转发的 `Via` 地址。
+- 已有成员使用其他网段（例如 `172.27.x.x`）不代表配置出错。**未经确认不能删除已有地址池、成员 IP 或默认路由**；这些可能属于其他正常工作的设备。
+- 先记录原有路由和分配，再最小范围修复冲突、无效路由或重复地址；必要时分批变更并验证设备互访，避免整网断开。
+- 只有明确要启用 IPv4 Exit Node 时才额外配置 `0.0.0.0/0 via <网关 ZeroTier IP>`，并在目标客户端按需启用 Allow Default。
+
+网络参数变更后，先在客户端检查 `zerotier-cli listnetworks`、网卡实际地址和路由表，不要用某个固定 IP 段是否存在作为通用成功标准。如果需要重启 ZeroTier Windows 服务，先用 `Get-Service *ZeroTier*` 确认实际服务名，并评估对当前远程会话的影响。
 
 ## 开启 TUN 或全局代理后远程不通
 

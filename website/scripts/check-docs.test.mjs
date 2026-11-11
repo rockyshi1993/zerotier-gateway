@@ -81,7 +81,7 @@ test('source-linked behavior contracts pass and reject unsafe regressions', () =
     assert.ok(failures.some(x => x.includes(expected)), 'Expected regression not caught: ' + expected);
   }
   checkRegression('docs/proxy-multi-server.md',
-    s => s.replace('install-zerotier.sh', 'install.sh'),
+    s => s.replaceAll('sudo bash scripts/ubuntu/install-zerotier.sh', 'sudo bash scripts/ubuntu/install.sh'),
     'multi-server must authorize');
   checkRegression('docs/windows.md',
     s => s.replace("show-diagnostics.ps1 -FindProcess 'ZeroTier'", 'show-diagnostics.ps1'),

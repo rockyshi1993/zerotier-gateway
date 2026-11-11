@@ -16,6 +16,8 @@ git status --short
 # 示例：在真正发布前将 vX.Y.Z 替换为已确认的、尚未发布的正式版本（非 -dev）
 RELEASE_TAG='vX.Y.Z'
 # 注意：此处是模板占位符；替换之前不要继续执行
+# 验证格式和不存在性：不要把 vX.Y.Z 或 -dev 标记当成正式发布版
+[[ "$RELEASE_TAG" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || echo "ERROR: 请先替换成正式版本号；不要继续发布"
 git tag --list "$RELEASE_TAG"
 git ls-remote --tags origin "refs/tags/$RELEASE_TAG"
 ```
@@ -33,11 +35,14 @@ bash -n scripts/ubuntu/lib/*.sh
 ```bash
 bash tests/shell/env-parse.test.sh
 bash tests/shell/init-config.test.sh
-bash tests/shell/sing-box-install.test.sh
-# 本地可运行的其余 Shell 测试
+# 在 Linux/macOS 的 Bash 终端
 for test in tests/shell/*.test.sh; do bash "$test"; done
-# Windows PowerShell 中运行：
-# Get-ChildItem tests/powershell/*.Tests.ps1 | ForEach-Object { & $_.FullName }
+```
+
+Windows 使用 **PowerShell** 运行所有回归测试（与 Bash 分开执行）：
+
+```powershell
+Get-ChildItem tests/powershell -Filter '*.Tests.ps1' | ForEach-Object { & $_.FullName }
 ```
 
 执行差异检查：
