@@ -8,7 +8,8 @@ import {
   validateScriptRefs,
   validateRspressRoutes,
   validateHomepageRoutes,
-  validateKeyContracts
+  validateKeyContracts,
+  validateBehaviorContracts
 } from './check-docs-core.mjs';
 
 const websiteDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,6 +41,7 @@ const config = read('website/rspress.config.ts');
 for (const message of validateRspressRoutes(config, docsDir)) errors.push(`rspress.config.ts: ${message}`);
 for (const message of validateHomepageRoutes(read('docs/index.md'), docsDir)) errors.push(`docs/index.md: ${message}`);
 for (const message of validateKeyContracts(read)) errors.push(message);
+for (const message of validateBehaviorContracts(read)) errors.push(message);
 
 const workflow = read('.github/workflows/pages.yml');
 for (const path of ['"scripts/**"', '"templates/**"', '"config/**"', '"VERSION"']) {

@@ -1,0 +1,76 @@
+name: Runtime contract tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "config/**"
+      - "VERSION"
+      - "tests/**"
+      - "templates/**"
+      - "docs/**"
+      - "website/**"
+      - ".github/workflows/runtime-contracts.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "config/**"
+      - "VERSION"
+      - "tests/**"
+      - "templates/**"
+      - "docs/**"
+      - "website/**"
+      - ".github/workflows/runtime-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Ubuntu shell regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do bash -n "$file"; done < <(find scripts/ubuntu tests/shell -type f -name '*.sh' -print | sort)
+          bash -n zerotier-gateway-setup.sh
+      - name: Run shell tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in tests/shell/*.test.sh; do
+            echo "::group::$test"
+            bash "$test"
+            echo "::endgroup::"
+          done
+
+  powershell:
+    name: Windows PowerShell regression tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - name: Parse Windows scripts
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem 'scripts/windows','tests/powershell' -Recurse -Include *.ps1,*.psm1 -File)
+          foreach ($file in $files) {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors) { throw "$($file.FullName) : $($errors | Out-String)" }
+          }
+      - name: Run PowerShell tests
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($test in (Get-ChildItem tests/powershell -Filter '*.Tests.ps1' | Sort-Object Name)) {
+            Write-Host "Running $($test.Name)"
+            & $test.FullName
+          }

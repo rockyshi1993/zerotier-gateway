@@ -135,11 +135,11 @@ sudo bash scripts/ubuntu/manage-exit-node.sh test
 
 ## 公网端口或域名外部不可访问
 
-先分层，不要直接重装：
+先分层，不要直接重装（以下 `mysite` 是示例，须替换为已创建映射的实际名称；两种发布模式只执行对应的一条）：
 
 ```bash
-sudo bash scripts/ubuntu/manage-publish.sh test --name <映射名>
-sudo bash scripts/ubuntu/manage-publish.sh test-domain --name <域名映射名>
+sudo bash scripts/ubuntu/manage-publish.sh test --name mysite
+sudo bash scripts/ubuntu/manage-publish.sh test-domain --name mysite
 sudo ss -lntp
 ```
 
@@ -174,7 +174,7 @@ sudo bash scripts/ubuntu/install-proxy.sh --allow-zerotier-udp
 sudo ufw allow 9993/udp comment 'zerotier'
 ```
 
-之后再看 `zerotier-cli peers`，对端应变为 `DIRECT`。云厂商防火墙组如果挂在这台机器上，也要放行入站 UDP `9993`。撤回：`sudo ufw delete allow 9993/udp`。
+之后再次检查 `zerotier-cli peers`、实际 path 和延迟：放行 UDP `9993` **可能改善 DIRECT 建立率，但不保证一定转为 DIRECT**；NAT、运营商 CGNAT、云安全组或对端网络条件仍可能导致 RELAY。云厂商安全组也要检查入站 UDP `9993`。撤回项目建议规则前请核对规则归属；本机示例可使用 `sudo ufw delete allow 9993/udp`。
 
 ### 1. 恢复路由器的 UDP 映射
 
@@ -211,52 +211,40 @@ zerotier-cli peers
 ping -n 20 <对端 ZeroTier IP>
 ```
 
-预期是连接由 `RELAY` 变为 `DIRECT`，并且延迟明显下降。若已具备公网 IPv4、UDP 映射正确且仍无法长期直连，可以按[中转兜底](relay.md)使用 Ubuntu TCP 中转；中转不需要家里宽带有公网 IPv4，但只作为直连无法恢复时的后备方案。
+重新观察 `zerotier-cli peers` 的实际 path 与延迟；条件改善时**可能**由 `RELAY` 转为 `DIRECT`，不能预先保证。若公网 IPv4、UDP 映射均已确认仍无法直连，可以按[指定 TCP 中转](relay.md)处理明确的远程 TCP 服务；它不等于 ZeroTier 底层通用中继。
 
 ## ZeroTier 无法连通
 
-检查：
+这一阶段先核实**实际加入的 Network ID、授权和设备自己的 Managed IP**。成员互访不要求先部署 Ubuntu，也不要求恰好三台设备。
 
-1. 设备已经在 ZeroTier Central 授权。
-2. 基础三台机器的 ZeroTier IP 已按预期固定；更多设备也已固定为不冲突的 IP。
-3. Windows 防火墙允许对端 ZeroTier IP 访问远程端口。
-4. `10.246.77.0/24` 的路由走 ZeroTier。
-5. ZeroTier Central 里没有残留 `172.27.x.x` 地址池或成员 IP。
+1. 两端使用同一个受信任的 ZeroTier Private Network，并且已在 Central 授权。
+2. 每台设备的 ZeroTier 地址与其网卡实际地址一致，且与其他成员不冲突。
+3. 当前私网网段不能与家里、公司、其他 VPN 或云网络的已有路由冲突。
+4. 目标主机确实在对应地址/端口上提供服务；防火墙允许来自预期 ZeroTier 成员的流量。
+5. 如果存在应用级代理或 TUN，先确认它没有错误接管 ZeroTier 网络的路径。
 
-运行：
-
-```powershell
-.\scripts\windows\test-network.ps1
-```
-
-## ZeroTier Central 网段或地址池配置不干净
-
-到 ZeroTier Central 的网络详情页，打开 `Advanced`，建议保持：
-
-| 位置 | 应该保留 |
-|---|---|
-| `Managed Routes` | `10.246.77.0/24 (LAN)` |
-| `IPv4 Auto-Assign` | 可以关闭自动分配，改为手动固定 IP |
-| `Auto-Assign Pools` | 如果保留自动分配，只用 `10.246.77.100` 到 `10.246.77.254` |
-
-不要把 `10.246.77.0/24` 填到 `Via`。如果还有 `172.27.0.1` 到 `172.27.255.254` 的自动分配地址池、成员机器上的 `172.27.x.x`，或误填的 `192.168.x.x` 地址池，建议删掉。
-
-基础三台机器只保留：
-
-| 设备 | Managed IP |
-|---|---|
-| Ubuntu 节点 | `10.246.77.1` |
-| 家里 Windows 电脑 | `10.246.77.10` |
-| 公司 Windows 电脑 | `10.246.77.20` |
-
-调整后，在 Windows 上执行：
+Windows 可执行：
 
 ```powershell
-Restart-Service ZeroTierOneService
+zerotier-cli info
 zerotier-cli listnetworks
+Get-NetRoute -AddressFamily IPv4
+Test-NetConnection 10.246.77.1 -Port 10808
 ```
 
-`listnetworks` 里应该只看到本机的 `10.246.77.x/24`，不应该再看到 `172.27.x.x`。
+最后一条仅是**Ubuntu 私有代理已部署时**的示例；只测试成员互访或其他服务时改为实际目标 IP/端口，也不必存在 `10.246.77.1`。需要读取本项目 `.env` 的诊断脚本，先确认该 Windows 已初始化配置。
+
+## ZeroTier Central 地址池与路由检查
+
+在对应 Network 的设置中，核实 `Managed Routes`、`IPv4 Auto-Assign` 与成员手动分配 IP 是否互相一致。
+
+- 新部署时可使用与现有网络**不冲突**的网段；`10.246.77.0/24` 仅是本文示例。
+- 如果使用该示例，Central 的本地私网路由应指向这一网络，不要将该网段误填成经某台成员转发的 `Via` 地址。
+- 已有成员使用其他网段（例如 `172.27.x.x`）不代表配置出错。**未经确认不能删除已有地址池、成员 IP 或默认路由**；这些可能属于其他正常工作的设备。
+- 先记录原有路由和分配，再最小范围修复冲突、无效路由或重复地址；必要时分批变更并验证设备互访，避免整网断开。
+- 只有明确要启用 IPv4 Exit Node 时才额外配置 `0.0.0.0/0 via <网关 ZeroTier IP>`，并在目标客户端按需启用 Allow Default。
+
+网络参数变更后，先在客户端检查 `zerotier-cli listnetworks`、网卡实际地址和路由表，不要用某个固定 IP 段是否存在作为通用成功标准。如果需要重启 ZeroTier Windows 服务，先用 `Get-Service *ZeroTier*` 确认实际服务名，并评估对当前远程会话的影响。
 
 ## 开启 TUN 或全局代理后远程不通
 
@@ -308,77 +296,61 @@ zerotier-cli peers
 
 ## 代理无法连通
 
-检查：
+**先按故障层定位，不要直接重新执行 `install.sh`。** 当前推荐的首次部署方式是先 ZeroTier 入网并授权，再单独安装代理，详见 [快速开始](quick-start.md)。
 
-1. Ubuntu 节点已经拿到 `10.246.77.1`。
-2. sing-box 服务正在运行。
-3. 默认私有入口时，代理监听在 `10.246.77.1:10808`。
-4. 已加入 ZeroTier 的 Windows 优先测试 `10.246.77.1:10808`；如果这条能通，就不需要为了代理改成公网 IP。
-5. 如果客户端要走公网路径，确认 Ubuntu 初始化脚本中已选择启用公网入口，并填入服务器公网 IP。
-6. 如果启用了公网入口，且客户端要走公网路径，云防火墙和 Ubuntu 防火墙允许客户端访问 `10808/tcp`。
-7. 如果启用了公网入口，初始化时的来源公网 IP/CIDR 可以留空；留空表示允许全部来源访问代理端口。
-8. 如果启用了代理认证，用户名和密码正确；如果没启用认证，客户端里不要填写用户名和密码。
-9. 如果刚修改过代理账号密码、代理入口或白名单，Ubuntu 上已经重新执行 `sudo bash scripts/ubuntu/install-proxy.sh`，客户端软件、PAC 或本地规则也已经同步。
+### 1. Ubuntu ZeroTier 是否就绪
 
-如果 Ubuntu 上看到：
-
-```text
-Proxy port 10808 is not listening
-Unit sing-box-zt-proxy.service could not be found.
-```
-
-说明代理服务没有装上。普通用户先重新执行主安装命令：
+在 **Ubuntu** 仓库根目录：
 
 ```bash
-sudo bash scripts/ubuntu/install.sh
+sudo zerotier-cli info
+sudo zerotier-cli listnetworks
+ip -4 -br addr
 ```
 
-`scripts/ubuntu/install-proxy.sh` 是单独修代理时用的子脚本；主流程不需要直接运行它。
+检查目标 Network 为 `OK`，ZeroTier 网卡上确实存在初始化时填写的 Ubuntu ZT IP（示例 `10.246.77.1`）。如果显示 `ACCESS_DENIED`、`REQUESTING_CONFIGURATION` 或实际地址错误，先到 Central 授权并修正 Managed IP，不要尝试启动一个绑定到不存在 IP 的服务。
 
-如果 `zerotier-cli listnetworks` 显示 `ACCESS_DENIED`，说明 Ubuntu 节点还没有在 ZeroTier Central 授权，或没有分配计划中的 `10.246.77.1`。先在 Central 授权该节点并设置 Managed IP，再回到 Ubuntu 执行：
+### 2. 服务和监听是否正常
 
 ```bash
-sudo systemctl restart sing-box-zt-proxy
+sudo systemctl is-active sing-box-zt-proxy
 sudo systemctl status sing-box-zt-proxy --no-pager
 sudo ss -lntp | grep ':10808'
-sudo bash scripts/ubuntu/health-check.sh
-```
-
-通过标准是 `sing-box-zt-proxy` 为 `active`，并且 `ss` 能看到 `10.246.77.1:10808`。如果服务仍失败，再查看：
-
-```bash
 sudo journalctl -u sing-box-zt-proxy -n 80 --no-pager
 ```
 
-如果安装时看到：
-
-```text
-Unable to locate package sing-box
-```
-
-说明当前 Ubuntu 源里没有 sing-box 包。更新到最新脚本后重新执行主安装命令，脚本会自动添加官方 SagerNet apt 源后继续安装：
-
-```bash
-git pull
-sudo bash scripts/ubuntu/install.sh
-```
-
-运行：
-
-```powershell
-.\scripts\windows\test-proxy.ps1
-```
-
-`test-proxy.ps1` 会测试 Windows 初始化时选择的代理入口，并继续验证真实出口。如果已经启用公网入口，但输出仍测试 `10.246.77.1:10808`，说明 Windows 当前仍使用 ZeroTier 私有入口；这对已加入 ZeroTier 的 Windows 是正常且更安全的。要测试公网路径时，重新运行 Windows 初始化脚本并选择服务器公网 IP。
-
-如果默认私有入口慢，但公网代理工具很快，按[公网代理](proxy-public.md)重新运行初始化脚本并验证公网入口。
-
-然后在 Ubuntu 上执行：
+如果使用自定义代理端口，应替换示例 `10808`。如果之前仅仅缺少代理组件，**在 ZeroTier 已经授权且 IP 正确之后**，先预览，再专项安装：
 
 ```bash
 sudo bash scripts/ubuntu/install-proxy.sh --dry-run
 sudo bash scripts/ubuntu/install-proxy.sh
 ```
+
+注意 `install-proxy.sh` 会生成/覆盖代理配置、调整其防火墙规则并重启 sing-box，已有连接可能中断；即使 `--dry-run` 也可能在 `artifacts/` 写入生成文件。不要把它当作只读健康检查，更不要无条件重跑包含 ZeroTier 安装与设置的 `install.sh`。
+
+### 3. Windows 到代理端口是否可达
+
+在已加入同一 ZeroTier 网络并获授权的 **Windows** 运行：
+
+```powershell
+Test-NetConnection 10.246.77.1 -Port 10808
+```
+
+若 TCP 不通，先核对 ZeroTier IP、Ubuntu sing-box 监听地址、UFW、主机/云防火墙和客户端路由。**不要为了修复 TCP 不通直接把代理监听切成公网 `0.0.0.0`。** UDP `9993` 只影响 ZeroTier 入站连通性条件，不能保证 TCP 代理端口已经打开。
+
+### 4. 端口通但代理出口失败
+
+```powershell
+curl.exe --ssl-no-revoke -x socks5h://10.246.77.1:10808 https://api.ipify.org
+```
+
+如果启用了认证，请使用支持安全输入凭据的客户端；不要把明文口令粘贴到共享日志或提交到仓库。核对 SOCKS5/HTTP 协议、身份认证、Ubuntu 实际互联网出口及 sing-box 日志。**代理端口可达不等于真实出口成功；只有得到并核对 Ubuntu 公网出口 IP 才算通过。**
+
+### 5. 只有业务软件不走代理
+
+检查该软件是否已经主动启用 HTTP/SOCKS5 或本地规则接管。加入 ZeroTier 不会自动修改 Windows 系统代理。使用 PAC、v2rayN、TUN 或节点池时，应分别按 [代理使用](proxy.md)、[代理规则](proxy-rules.md)、[多节点](proxy-multi-server.md) 的生效范围排查。
+
+如果经证实私有路径不稳定，先检查实际 ZeroTier DIRECT/RELAY 和底层 UDP/NAT 条件；**公网 mixed 代理没有内建 TLS**，不应被作为默认的“提速修复”。如确需使用公网入口，必须先阅读 [公网代理安全要求](proxy-public.md)。
 
 ## 进程排除没有命中
 

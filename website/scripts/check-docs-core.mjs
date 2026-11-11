@@ -121,3 +121,77 @@ export function validateKeyContracts(read) {
   if (version && !read('docs/index.md').includes(version)) failures.push(`Home does not declare current version: ${version}`);
   return failures;
 }
+
+
+// Source-linked guardrails complement (rather than replace) executable OS tests.
+// Do not use prose-length or step-number constraints as correctness proofs.
+export function validateBehaviorContracts(read) {
+  const errors = [];
+  const multi = read('docs/proxy-multi-server.md');
+  const quick = read('docs/quick-start.md');
+  const trouble = read('docs/troubleshooting.md');
+  const windows = read('docs/windows.md');
+  const upgrade = read('docs/upgrade.md');
+  const publish = read('docs/publish-site.md');
+  const rollbackDoc = read('docs/rollback.md');
+  const release = read('docs/release.md');
+  const setup = read('scripts/windows/setup.ps1');
+  const domain = read('scripts/ubuntu/manage-domain.sh');
+
+  for (const [label, source] of [['quick-start', quick], ['multi-server', multi]]) {
+    // Only executable command lines count; prose mentioning a script is not evidence
+    // that the install guide actually instructs users to run it.
+    const join = source.search(/^\s*sudo bash scripts\/ubuntu\/install-zerotier\.sh(?:\s|$)/m);
+    const networkCheck = source.search(/^\s*sudo zerotier-cli listnetworks\s*$/m);
+    const proxy = source.search(/^\s*sudo bash scripts\/ubuntu\/install-proxy\.sh(?:\s|$)/m);
+    if (join < 0 || proxy < 0 || networkCheck < join || networkCheck >= proxy || join >= proxy) {
+      errors.push(label + ' must authorize and inspect ZeroTier before installing sing-box');
+    }
+  }
+  if (!multi.includes('PAC / 本地分流客户端接入节点池尚无自动组合流程')) {
+    errors.push('Multi-server guide must not claim automatic PAC/local-rules proxy-pool integration');
+  }
+  if (multi.includes('按提示把代理入口设为')) {
+    errors.push('Multi-server guide uses an unsupported init-config proxy-pool selection');
+  }
+
+  for (const [path, source] of [['docs/windows.md', windows], ['docs/upgrade.md', upgrade]]) {
+    if (/^\s*\.\\scripts\\windows\\show-diagnostics\.ps1\s*$/m.test(source) ||
+        !/^\s*\.\\scripts\\windows\\show-diagnostics\.ps1\s+-FindProcess\b/m.test(source)) {
+      errors.push(path + ' must give actionable show-diagnostics.ps1 parameters');
+    }
+  }
+  if (/^\s*sudo bash scripts\/ubuntu\/install\.sh(?:\s|$)/m.test(trouble)) {
+    errors.push('Proxy troubleshooting must not blindly rerun the full gateway installer');
+  }
+  if (/对端应变为 .*DIRECT/.test(trouble) || !trouble.includes('不保证一定转为 DIRECT')) {
+    errors.push('Opening UDP 9993 must not promise a DIRECT connection');
+  }
+  if (!trouble.includes('公网 mixed 代理没有内建 TLS')) {
+    errors.push('Troubleshooting must not recommend unencrypted public proxy as a generic speed fix');
+  }
+
+  if (!publish.includes('staging 时') || !publish.includes('curl --insecure') ||
+      !publish.includes('生产检查不使用') || !publish.includes('证书链')) {
+    errors.push('Domain publishing docs must distinguish staging handshake from trusted production TLS');
+  }
+  if (!domain.includes('curl_tls+=(--insecure)') ||
+      !domain.includes('certificate trust was NOT verified') ||
+      !domain.includes('certificate verification enabled')) {
+    errors.push('Domain test logs must distinguish staging (insecure) from production certificate verification');
+  }
+
+  const rollbackPos = setup.indexOf('if ($Rollback) {');
+  const envPos = setup.indexOf('$config = Read-ZtgEnv');
+  if (rollbackPos < 0 || envPos < 0 || rollbackPos > envPos ||
+      !setup.slice(rollbackPos, envPos).includes('Remove-ZtgFirewallRules')) {
+    errors.push('Windows firewall rollback must run without requiring a valid .env');
+  }
+  if (!rollbackDoc.includes('不依赖 ' + String.fromCharCode(96) + '.env' + String.fromCharCode(96))) {
+    errors.push('Rollback docs must describe config-independent Windows cleanup');
+  }
+  if (!release.includes('RELEASE_TAG') || /git tag -a v1\.3\.0/.test(release)) {
+    errors.push('Release guide must not instruct recreating the existing v1.3.0 tag');
+  }
+  return errors;
+}

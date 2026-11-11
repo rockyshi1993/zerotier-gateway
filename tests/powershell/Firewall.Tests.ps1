@@ -51,3 +51,15 @@ if ($source -notmatch 'Assert-ZtgFirewallAdministrator') {
 }
 
 Write-Host 'Firewall.Tests.ps1 passed'
+
+
+# Rollback must work even if .env is missing or invalid.
+$setupSource = Get-Content -LiteralPath (Join-Path $root 'scripts\windows\setup.ps1') -Raw
+$rollbackPosition = $setupSource.IndexOf('if ($Rollback) {')
+$configPosition = $setupSource.IndexOf('$config = Read-ZtgEnv')
+if ($rollbackPosition -lt 0 -or $configPosition -lt 0 -or $rollbackPosition -ge $configPosition) {
+  throw 'setup.ps1 -Rollback must not depend on a valid .env.'
+}
+if (-not $setupSource.Substring($rollbackPosition, $configPosition - $rollbackPosition).Contains('Remove-ZtgFirewallRules')) {
+  throw 'Config-independent rollback path does not call project-owned firewall cleanup.'
+}

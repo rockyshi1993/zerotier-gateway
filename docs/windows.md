@@ -71,11 +71,13 @@ curl.exe --ssl-no-revoke -x socks5h://10.246.77.1:10808 https://api.ipify.org
 ## 5. 诊断与恢复
 
 ```powershell
-.\scripts\windows\show-diagnostics.ps1
+.\scripts\windows\show-diagnostics.ps1 -FindProcess 'ZeroTier'
 .\scripts\windows\test-network.ps1
 .\scripts\windows\test-proxy.ps1
 ```
 
-`test-proxy.ps1` 使用 Windows 项目根目录 `.env` 里的目标代理配置。若你仅使用软件手动设置代理，也可以直接通过 `Test-NetConnection` 和 `curl.exe` 验证，不必运行配置初始化器。
+`show-diagnostics.ps1` 只有提供 `-FindProcess` 或 `-FindProcessPath` 才会查询进程；**无参数只输出用法**，不是网络诊断。
+
+`test-network.ps1` 与 `test-proxy.ps1` 需要 Windows 项目根目录有有效的 `.env` 配置，否则先通过 `init-config.ps1` 生成；若你仅使用软件手动设置代理，也可以直接通过 `Test-NetConnection` 和 `curl.exe` 验证，不必运行配置初始化器。
 
 如需移除项目生成的防火墙规则，管理员 PowerShell 执行 `setup.ps1 -Rollback`；它不会卸载 ZeroTier、关闭第三方代理客户端或还原全部 Windows 系统网络设置，详见 [回滚与卸载](rollback.md)。

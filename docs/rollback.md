@@ -74,7 +74,7 @@ sudo bash scripts/ubuntu/manage-publish.sh remove-domain --name mysite --apply
 
 ## 5. Windows 资源
 
-在管理员 PowerShell 下移除由 Home/Work 脚本创建的规则：
+在管理员 PowerShell 下移除由 Home/Work 脚本创建的规则（`-Rollback` **不依赖 `.env` 是否存在或有效**，但仍要求管理员权限；只删除项目约定名称的规则，不会撤销用户自己创建的防火墙规则）：
 
 ```powershell
 .\scripts\windows\setup.ps1 -Rollback

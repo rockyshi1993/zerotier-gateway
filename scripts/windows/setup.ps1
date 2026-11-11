@@ -33,14 +33,16 @@ Options:
   exit 0
 }
 
-$config = Read-ZtgEnv -Path $Env
-Assert-ZtgEnv -Config $config
-
+# Cleanup must stay usable even when .env was deleted or became invalid.
+# Remove-ZtgFirewallRules checks elevation and limits deletion to project-named rules.
 if ($Rollback) {
-  Write-ZtgInfo 'Removing firewall rules created by this project.'
+  Write-ZtgInfo 'Removing firewall rules created by this project (no .env required).'
   Remove-ZtgFirewallRules
   exit 0
 }
+
+$config = Read-ZtgEnv -Path $Env
+Assert-ZtgEnv -Config $config
 
 if (-not $Role) {
   throw 'Role is required. Use -Role Home or -Role Work.'
