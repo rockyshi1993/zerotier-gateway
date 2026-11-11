@@ -19,6 +19,8 @@
 
 ## 如果使用微软远程桌面
 
+如需运行本项目的 Windows PowerShell 脚本，请先按 [Windows 获取脚本步骤](windows.md#0-获取脚本只在需要本项目辅助功能时) 在**被访问的电脑**下载仓库并进入根目录；只使用 ZeroTier 客户端互访的用户无需下载本项目。
+
 Windows Pro、Enterprise、Education 等可按系统支持范围作为远程桌面主机；**Windows Home 通常不能作为内置 RDP 主机**，但可以作为客户端，或使用其他远程工具。被访问设备需要保持开机、允许运行 RDP 和账户登录，推荐保持网络级别身份验证（NLA）。
 
 在**被访问的 Windows** 仓库目录，用管理员 PowerShell 预览并启用：
