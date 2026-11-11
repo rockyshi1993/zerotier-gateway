@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   unclosedCodeFences,
   getMarkdownTargets,
@@ -11,7 +12,8 @@ import {
   validateScriptRefs,
   validateRspressRoutes,
   validateHomepageRoutes,
-  validateKeyContracts
+  validateKeyContracts,
+  validateBehaviorContracts
 } from './check-docs-core.mjs';
 
 function fixture(fn) {
@@ -65,4 +67,35 @@ test('quick-start order and version mismatches are rejected', () => {
   const failures = validateKeyContracts(path => sample[path]);
   assert.ok(failures.some(x => x.includes('before binding sing-box')));
   assert.ok(failures.some(x => x.includes('README does not declare current version')));
+});
+
+
+test('source-linked behavior contracts pass and reject unsafe regressions', () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const realRead = path => readFileSync(join(root, path), 'utf8');
+  assert.deepEqual(validateBehaviorContracts(realRead), []);
+
+  function checkRegression(path, edit, expected) {
+    const broken = source => source === path ? edit(realRead(source)) : realRead(source);
+    const failures = validateBehaviorContracts(broken);
+    assert.ok(failures.some(x => x.includes(expected)), 'Expected regression not caught: ' + expected);
+  }
+  checkRegression('docs/proxy-multi-server.md',
+    s => s.replace('install-zerotier.sh', 'install.sh'),
+    'multi-server must authorize');
+  checkRegression('docs/windows.md',
+    s => s.replace("show-diagnostics.ps1 -FindProcess 'ZeroTier'", 'show-diagnostics.ps1'),
+    'docs/windows.md must give actionable');
+  checkRegression('docs/troubleshooting.md',
+    s => s.replace('不保证一定转为 DIRECT', '保证转为 DIRECT'),
+    'Opening UDP 9993');
+  checkRegression('scripts/windows/setup.ps1',
+    s => s.replace('if ($Rollback) {', 'if ($UnsupportedRollback) {'),
+    'Windows firewall rollback');
+  checkRegression('scripts/ubuntu/manage-domain.sh',
+    s => s.replace('certificate trust was NOT verified', 'certificate trust was verified'),
+    'Domain test logs');
+  checkRegression('docs/release.md',
+    s => s.replace('git tag -a "$RELEASE_TAG"', 'git tag -a v1.3.0'),
+    'Release guide');
 });

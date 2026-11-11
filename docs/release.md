@@ -34,9 +34,10 @@ bash -n scripts/ubuntu/lib/*.sh
 bash tests/shell/env-parse.test.sh
 bash tests/shell/init-config.test.sh
 bash tests/shell/sing-box-install.test.sh
-powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/Firewall.Tests.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/InitConfig.Tests.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File tests/powershell/ProxyRules.Tests.ps1
+# 本地可运行的其余 Shell 测试
+for test in tests/shell/*.test.sh; do bash "$test"; done
+# Windows PowerShell 中运行：
+# Get-ChildItem tests/powershell/*.Tests.ps1 | ForEach-Object { & $_.FullName }
 ```
 
 执行差异检查：
