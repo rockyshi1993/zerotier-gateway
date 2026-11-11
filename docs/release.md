@@ -17,7 +17,7 @@ git status --short
 RELEASE_TAG='vX.Y.Z'
 # 注意：此处是模板占位符；替换之前不要继续执行
 # 验证格式和不存在性：不要把 vX.Y.Z 或 -dev 标记当成正式发布版
-[[ "$RELEASE_TAG" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || echo "ERROR: 请先替换成正式版本号；不要继续发布"
+[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || echo "ERROR: 请先替换成正式版本号；不要继续发布"
 git tag --list "$RELEASE_TAG"
 git ls-remote --tags origin "refs/tags/$RELEASE_TAG"
 ```
